@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { LimitError, NotFoundError, UsageError } from "../errors.ts";
+import { openSession } from "../graph/session.ts";
 import { fakeAdapter, loadMinimalStructure, minimalSession } from "../test/helpers.ts";
 import { runLine } from "./core.ts";
 import { parseCommand } from "./parse.ts";
@@ -80,6 +81,23 @@ describe("runLine", () => {
     if (out.result.kind === "text") {
       expect(out.result.text).toContain("3 0 R");
       expect(out.result.text).toContain("4 0 R");
+    }
+  });
+
+  test("tree terminates and marks a cycle in the page tree", async () => {
+    const structure = loadMinimalStructure();
+    const page = structure.objects["4 0 R"];
+    if (page && page.value.kind === "dict") {
+      page.value.entries["/Kids"] = {
+        kind: "array",
+        items: [{ kind: "ref", ref: { objectNumber: 3, generation: 0 } }],
+      };
+    }
+    const s = openSession("minimal.pdf", structure);
+    const out = await runLine(s, "tree --depth 8");
+    expect(out.result.kind).toBe("text");
+    if (out.result.kind === "text") {
+      expect(out.result.text).toContain("(cycle)");
     }
   });
 

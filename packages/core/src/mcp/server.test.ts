@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, test } from "bun:test";
+import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
 import { bindSession } from "../session.ts";
 import { fakeAdapter, fixturePath, minimalSession } from "../test/helpers.ts";
 import { createMcpServer } from "./server.ts";
@@ -85,6 +86,21 @@ describe("MCP server", () => {
     expect(opens).toBe(2);
     const pwd = await client.callTool({ name: "pwd", arguments: {} });
     expect(JSON.stringify(pwd.content)).toContain("1 0 R");
+    await client.close();
+    await server.close();
+  });
+
+  test("stream tool caps oversized bytes instead of dumping them all as base64", async () => {
+    const big = new Uint8Array(MCP_STREAM_MAX_BYTES + 10);
+    const { client, server } = await connect({
+      openSession: async () =>
+        bindSession(minimalSession(), fakeAdapter({ readStream: async () => big })),
+    });
+    await client.callTool({ name: "open", arguments: { path: fixturePath("pdf", "minimal.pdf") } });
+    const result = await client.callTool({ name: "stream", arguments: { ref: "5 0 R" } });
+    const text = JSON.stringify(result.content);
+    expect(text).toContain("truncated");
+    expect(text).toContain(String(big.byteLength));
     await client.close();
     await server.close();
   });

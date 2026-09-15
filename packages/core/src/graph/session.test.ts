@@ -33,6 +33,15 @@ describe("session", () => {
     expect(s.path).toEqual(["4 0 R"]);
   });
 
+  test("back after cd by ref restores the prior path, not just cwd", () => {
+    const start = cd(minimalSession(), "/Pages");
+    const jumped = cd(start, "4 0 R");
+    expect(jumped.path).toEqual(["4 0 R"]);
+    const prev = back(jumped);
+    expect(prev.cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(prev.path).toEqual(["/Root", "/Pages"]);
+  });
+
   test("cd by array index when the current object is an array", () => {
     const structure = loadMinimalStructure();
     structure.objects["6 0 R"] = {
