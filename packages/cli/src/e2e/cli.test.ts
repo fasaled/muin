@@ -64,6 +64,31 @@ describe("CLI process", () => {
     expect(exitCode).toBe(1);
     expect(stderr).toContain("file not found");
   });
+
+  test("one-shot check and ls", async () => {
+    if (!existsSync(vendorPaths().wasm)) return;
+    const check = await runCli(["fixtures/pdf/minimal.pdf", "check"]);
+    expect(check.exitCode).toBe(0);
+    expect(check.stdout.length).toBeGreaterThan(0);
+
+    const ls = await runCli(["fixtures/pdf/minimal.pdf", "ls"]);
+    expect(ls.exitCode).toBe(0);
+    expect(ls.stdout).toContain("/Pages");
+  });
+
+  test("muin help lists commands without opening a PDF", async () => {
+    const { stdout, exitCode } = await runCli(["help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("ls");
+    expect(stdout).toContain("find");
+  });
+
+  test("completion prints a zsh script", async () => {
+    const { stdout, exitCode } = await runCli(["completion", "zsh"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("#compdef muin");
+    expect(stdout).toContain("export_graph");
+  });
 });
 
 

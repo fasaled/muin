@@ -1,11 +1,10 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { formatProcessError } from "@muin/core";
-import { mcpStdioInvocation, shouldAdvertiseMcp } from "./mcp-target.ts";
+import { mcpStdioInvocation } from "./mcp-target.ts";
 import { openExplorer, revealExplorer } from "./panel.ts";
 
 let lastPdf: string | undefined;
-const mcpChange = new vscode.EventEmitter<void>();
 let status: vscode.StatusBarItem | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -31,7 +30,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       if (!picked) return;
       lastPdf = picked.fsPath;
-      mcpChange.fire();
       setStatus(lastPdf);
       try {
         await vscode.window.withProgress(
@@ -40,7 +38,6 @@ export function activate(context: vscode.ExtensionContext): void {
         );
       } catch (err) {
         lastPdf = undefined;
-        mcpChange.fire();
         setStatus(undefined);
         await vscode.window.showErrorMessage(`Muin could not open this PDF: ${formatProcessError(err)}`);
       }
@@ -49,25 +46,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.lm.registerMcpServerDefinitionProvider("muin.mcp", {
-      onDidChangeMcpServerDefinitions: mcpChange.event,
-      provideMcpServerDefinitions: async () => {
-        if (!shouldAdvertiseMcp(lastPdf) || lastPdf === undefined) return [];
-        return [stdioDefinition(context, lastPdf)];
-      },
-      resolveMcpServerDefinition: async () => {
-        if (!lastPdf) {
-          const picked = await vscode.window.showOpenDialog({
-            canSelectMany: false,
-            filters: { PDF: ["pdf"] },
-            title: "PDF for Muin (Copilot / MCP)",
-            openLabel: "Use this PDF",
-          });
-          if (!picked?.[0]) return undefined;
-          lastPdf = picked[0].fsPath;
-          setStatus(lastPdf);
-        }
-        return stdioDefinition(context, lastPdf);
-      },
+      provideMcpServerDefinitions: async () => [stdioDefinition(context)],
+      resolveMcpServerDefinition: async (server) => server,
     }),
   );
 }
@@ -83,12 +63,10 @@ function setStatus(pdfPath: string | undefined): void {
   status.show();
 }
 
-function stdioDefinition(context: vscode.ExtensionContext, pdfPath: string): vscode.McpStdioServerDefinition {
+function stdioDefinition(context: vscode.ExtensionContext): vscode.McpStdioServerDefinition {
   const script = vscode.Uri.joinPath(context.extensionUri, "dist", "mcp-stdio.js").fsPath;
-  const inv = mcpStdioInvocation(process.execPath, script, pdfPath);
+  const inv = mcpStdioInvocation(process.execPath, script);
   return new vscode.McpStdioServerDefinition(inv.label, inv.command, inv.args, {});
 }
 
-export function deactivate(): void {
-  mcpChange.dispose();
-}
+export function deactivate(): void {}

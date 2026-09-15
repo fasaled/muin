@@ -81,7 +81,7 @@ bun test
 
 ## CI
 
-qpdf is **not** compiled on GitHub Actions. Rebuild locally with Docker when you bump pins, then commit `vendor/qpdf/`.
+There is no GitHub Actions workflow. Rebuild locally with Docker when you bump pins, then commit `vendor/qpdf/`.
 
 ## Bump procedure
 

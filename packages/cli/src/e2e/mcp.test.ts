@@ -6,8 +6,18 @@ import { vendorPaths } from "@muin/core";
 
 const wasmReady = existsSync(vendorPaths().wasm);
 
+function env(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    if (key.startsWith("BUN_")) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 describe.skipIf(!wasmReady)("MCP stdio process", () => {
-  test("lists tools and answers pwd via the built CLI", async () => {
+  test("starts without a PDF; open then pwd then close", async () => {
     const built = await Bun.spawn(["bun", "run", "build"], {
       cwd: process.cwd(),
       stdout: "pipe",
@@ -15,19 +25,12 @@ describe.skipIf(!wasmReady)("MCP stdio process", () => {
     }).exited;
     expect(built).toBe(0);
 
-    const env: Record<string, string> = {};
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value === undefined) continue;
-      if (key.startsWith("BUN_")) continue;
-      env[key] = value;
-    }
-
     const transport = new StdioClientTransport({
       command: "node",
-      args: ["packages/cli/dist/cli.js", "--mcp", "fixtures/pdf/minimal.pdf"],
+      args: ["packages/cli/dist/cli.js", "--mcp"],
       cwd: process.cwd(),
       stderr: "pipe",
-      env,
+      env: env(),
     });
     const errChunks: Buffer[] = [];
     transport.stderr?.on("data", (chunk: Buffer | string) => {
@@ -37,9 +40,21 @@ describe.skipIf(!wasmReady)("MCP stdio process", () => {
     try {
       await client.connect(transport);
       const listed = await client.listTools();
-      expect(listed.tools.map((t) => t.name)).toContain("export_graph");
+      expect(listed.tools.map((t) => t.name)).toContain("open");
+      const before = await client.callTool({ name: "pwd", arguments: {} });
+      expect(JSON.stringify(before)).toMatch(/no PDF is open/i);
+
+      const opened = await client.callTool({
+        name: "open",
+        arguments: { path: "fixtures/pdf/minimal.pdf" },
+      });
+      expect(JSON.stringify(opened.content)).toContain("1 0 R");
+
       const pwd = await client.callTool({ name: "pwd", arguments: {} });
       expect(JSON.stringify(pwd.content)).toContain("1 0 R");
+
+      const closed = await client.callTool({ name: "close", arguments: {} });
+      expect(JSON.stringify(closed.content)).toContain("closed");
     } catch (err) {
       const stderr = Buffer.concat(errChunks).toString();
       throw new Error(`${err instanceof Error ? err.message : String(err)}\nstderr:\n${stderr}`);

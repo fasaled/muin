@@ -106,13 +106,13 @@ Each entry: context, decision, consequences.
 
 **Consequences:** No WASM in the browser. Click and the command box are two UIs on `session.run`.
 
-## D14 — No qpdf compile on GitHub Actions
+## D14 — No GitHub Actions
 
-**Context:** Docker/emsdk compile of qpdf consumes private-repo Actions minutes.
+**Context:** Hosted Actions consume the private-repo minute quota (WASM compile was especially expensive).
 
-**Decision:** WASM is vendored and rebuilt locally with Docker. GHA runs tests only.
+**Decision:** No workflows under `.github/workflows`. Tests, typecheck, and builds run locally (`bun test`, `bun run build`). qpdf WASM is vendored and rebuilt with Docker on a developer machine.
 
-**Consequences:** Bumping qpdf is a local `docker build` plus a vendor commit.
+**Consequences:** Nothing runs on push. CI is optional and local.
 
 ## D15 — WASM `callMain` on a worker thread
 
@@ -121,3 +121,27 @@ Each entry: context, decision, consequences.
 **Decision:** `createSession` opens a `worker_threads` Worker that owns the adapter, MEMFS, and graph. The main thread holds a cached `snapshot()` and talks via sequenced RPC (`open` / `run` / `runCommand` / `close`). Tests that do not need WASM keep using `bindSession` in-process. Bundles emit `dist/session-worker.js` beside the CLI and the vsix.
 
 **Consequences:** Opening a PDF is still as slow as qpdf, but the prompt and extension host stay responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API).
+
+## D16 — MCP is a server; the agent opens and closes PDFs
+
+**Context:** Binding MCP to `muin --mcp file.pdf` copied the TUI model (one human, one file, one process). An agent already holds a long-lived stdio connection and should choose documents over that connection.
+
+**Decision:** MCP starts with no PDF. Tools `open` (path, optional maxBytes) and `close` own the worker session. Query tools require an open session (`no PDF is open; call the open tool first`). `open` replaces a previous PDF. One active PDF per MCP process. CLI `muin --mcp` is the normal form; `muin --mcp file.pdf` still pre-opens for scripts. VS Code always advertises MCP without a file picker.
+
+**Consequences:** Copilot can `open` any workspace PDF. TUI and the Explore PDF panel are unchanged. Concurrent PDFs in one MCP connection are out of scope.
+
+## D17 — One-shot CLI commands
+
+**Context:** MCP is a long-lived agent connection; the TUI is a REPL. Scripts and CI need “run this verb on this PDF and exit.”
+
+**Decision:** `muin <file.pdf> <command> [args…]` opens a worker session, runs one parsed line (same parser as the TUI), prints to stdout (`stream` as raw bytes), then closes. No extra tokens after the file still starts the TUI. `--mcp` cannot be mixed with a one-shot line. `muin help` prints core help without opening a PDF. `quit` is rejected as a one-shot.
+
+**Consequences:** Each invocation starts at `/Root`. `cd`/`back` do not persist. Same core, no new verbs.
+
+## D18 — Shell completion (bash, zsh, fish, PowerShell)
+
+**Context:** One-shot commands and flags are easy to mistype. Completions should work on Linux, macOS, and Windows (PowerShell / pwsh).
+
+**Decision:** `muin completion bash|zsh|fish|powershell` prints a script (`pwsh` is an alias of `powershell`). Completes global flags, `*.pdf` paths, command names, and per-command flags. Does not run qpdf to complete object IDs (too slow for Tab). No `postinstall` hook that edits shell rc files.
+
+**Consequences:** Opt-in install. Completions stay in sync if we regenerate the printed script from the same command list in `completion.ts`.

@@ -4,14 +4,10 @@ export type McpStdioInvocation = {
   args: string[];
 };
 
-export function shouldAdvertiseMcp(pdfPath: string | undefined): boolean {
-  return typeof pdfPath === "string" && pdfPath.length > 0;
-}
-
-export function mcpStdioInvocation(nodeExecutable: string, scriptPath: string, pdfPath: string): McpStdioInvocation {
+export function mcpStdioInvocation(nodeExecutable: string, scriptPath: string): McpStdioInvocation {
   return {
     label: "Muin",
     command: nodeExecutable,
-    args: [scriptPath, pdfPath],
+    args: [scriptPath],
   };
 }

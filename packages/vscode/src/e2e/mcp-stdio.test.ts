@@ -19,19 +19,7 @@ function env(): Record<string, string> {
 }
 
 describe.skipIf(!wasmReady)("VS Code bundled MCP stdio", () => {
-  test("exits 2 without a PDF path", async () => {
-    const proc = Bun.spawn(["bun", "packages/vscode/src/mcp-stdio.ts"], {
-      cwd: process.cwd(),
-      stdout: "pipe",
-      stderr: "pipe",
-      stdin: "ignore",
-    });
-    const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
-    expect(code).toBe(2);
-    expect(stderr).toContain("usage:");
-  });
-
-  test("lists tools and pwd against the fixture PDF", async () => {
+  test("connects with no PDF, then open / pwd / close", async () => {
     const built = await Bun.spawn(["bun", "run", "--filter", "muin", "build"], {
       cwd: process.cwd(),
       stdout: "pipe",
@@ -42,7 +30,7 @@ describe.skipIf(!wasmReady)("VS Code bundled MCP stdio", () => {
 
     const transport = new StdioClientTransport({
       command: "node",
-      args: [script, "fixtures/pdf/minimal.pdf"],
+      args: [script],
       cwd: process.cwd(),
       stderr: "pipe",
       env: env(),
@@ -55,13 +43,15 @@ describe.skipIf(!wasmReady)("VS Code bundled MCP stdio", () => {
     try {
       await client.connect(transport);
       const listed = await client.listTools();
-      expect(listed.tools.map((t) => t.name)).toContain("export_graph");
+      expect(listed.tools.map((t) => t.name)).toContain("open");
+      await client.callTool({ name: "open", arguments: { path: "fixtures/pdf/minimal.pdf" } });
       const pwd = await client.callTool({ name: "pwd", arguments: {} });
       expect(JSON.stringify(pwd.content)).toContain("1 0 R");
-      const graph = await client.callTool({ name: "export_graph", arguments: { depth: 1 } });
-      expect(JSON.stringify(graph.content)).toContain("nodes");
+      await client.callTool({ name: "close", arguments: {} });
     } catch (err) {
-      throw new Error(`${err instanceof Error ? err.message : String(err)}\nstderr:\n${Buffer.concat(errChunks).toString()}`);
+      throw new Error(
+        `${err instanceof Error ? err.message : String(err)}\nstderr:\n${Buffer.concat(errChunks).toString()}`,
+      );
     } finally {
       await client.close();
     }

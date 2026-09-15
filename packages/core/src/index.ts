@@ -1,5 +1,6 @@
 export { createSession, bindSession, type MuinSession, type SessionOptions, type SessionSnapshot, type CommandResult } from "./session.ts";
 export { parseCommand, type ParsedCommand } from "./commands/parse.ts";
+export { helpText } from "./commands/help.ts";
 export { formatBytes, formatLocation, formatSnapshot } from "./commands/format.ts";
 export { formatProcessError } from "./process-error.ts";
 export { createMcpServer, serveMcpStdio } from "./mcp/server.ts";

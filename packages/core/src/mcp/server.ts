@@ -1,8 +1,11 @@
+import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import type { CommandResult, MuinSession } from "../session.ts";
+import { createSession, type CommandResult, type MuinSession, type SessionOptions } from "../session.ts";
 import type { ParsedCommand } from "../commands/parse.ts";
+import { helpText } from "../commands/help.ts";
+import { UsageError } from "../errors.ts";
 
 function asText(result: CommandResult): string {
   if (result.kind === "text") return result.text;
@@ -14,8 +17,48 @@ function asText(result: CommandResult): string {
   return "";
 }
 
-export function createMcpServer(session: MuinSession): McpServer {
+function textResult(text: string, isError = false) {
+  return { content: [{ type: "text" as const, text }], isError };
+}
+
+export type McpServerOptions = {
+  openSession?: (path: string, options?: SessionOptions) => Promise<MuinSession>;
+  session?: MuinSession;
+};
+
+export function createMcpServer(options: McpServerOptions = {}): McpServer {
+  const opener = options.openSession ?? createSession;
+  let session: MuinSession | undefined = options.session;
   const server = new McpServer({ name: "muin", version: "0.0.0" });
+
+  const requireSession = (): MuinSession => {
+    if (!session) {
+      throw new UsageError("no PDF is open; call the open tool first");
+    }
+    return session;
+  };
+
+  server.tool(
+    "open",
+    "Open a PDF and start a navigation session. Closes any PDF already open. Later tools (ls, cd, find, …) operate on this file until close.",
+    { path: z.string(), maxBytes: z.number().positive().optional() },
+    async (args) => {
+      const filePath = resolve(String(args.path));
+      session?.close();
+      session = undefined;
+      const opts: SessionOptions = args.maxBytes === undefined ? {} : { maxBytes: args.maxBytes };
+      session = await opener(filePath, opts);
+      const pwd = await session.run("pwd");
+      return textResult(`opened ${session.filePath}\n${asText(pwd)}`);
+    },
+  );
+
+  server.tool("close", "Close the current PDF session and free the worker. Safe if nothing is open.", {}, async () => {
+    if (!session) return textResult("no PDF was open");
+    session.close();
+    session = undefined;
+    return textResult("closed");
+  });
 
   const tool = (
     name: string,
@@ -24,8 +67,9 @@ export function createMcpServer(session: MuinSession): McpServer {
     toCmd: (args: Record<string, unknown>) => ParsedCommand,
   ) => {
     server.tool(name, description, schema, async (args) => {
-      const result = await session.runCommand(toCmd(args as Record<string, unknown>));
-      return { content: [{ type: "text" as const, text: asText(result) }] };
+      const current = requireSession();
+      const result = await current.runCommand(toCmd(args as Record<string, unknown>));
+      return textResult(asText(result));
     });
   };
 
@@ -91,15 +135,33 @@ export function createMcpServer(session: MuinSession): McpServer {
       ...(a.find ? { find: String(a.find) } : {}),
     }),
   );
-  tool("help", "Command help", { command: z.string().optional() }, (a) =>
-    a.command ? { name: "help", command: String(a.command) } : { name: "help" },
-  );
+  server.tool("help", "Command help, including MCP open/close", { command: z.string().optional() }, async (args) => {
+    const extra =
+      "open   open a PDF by path (starts or replaces the session)\nclose  close the current PDF session";
+    const cmd = args.command === undefined ? undefined : String(args.command);
+    if (cmd === "open") return textResult("open  open a PDF by path and start a session (closes any previous PDF)");
+    if (cmd === "close") return textResult("close  close the current PDF session");
+    return textResult(`${helpText(cmd)}\n${cmd ? "" : extra}`.trim());
+  });
 
   return server;
 }
 
-export async function serveMcpStdio(session: MuinSession): Promise<void> {
-  const server = createMcpServer(session);
+export type ServeMcpOptions = McpServerOptions & {
+  initialPath?: string;
+  maxBytes?: number;
+};
+
+export async function serveMcpStdio(options: ServeMcpOptions = {}): Promise<void> {
+  const opener = options.openSession ?? createSession;
+  let session = options.session;
+  if (options.initialPath) {
+    session = await opener(
+      resolve(options.initialPath),
+      options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes },
+    );
+  }
+  const server = createMcpServer(session === undefined ? { openSession: opener } : { openSession: opener, session });
   const transport = new StdioServerTransport();
   const closed = new Promise<void>((resolve) => {
     const prev = server.server.onclose;

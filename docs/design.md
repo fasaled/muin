@@ -2,14 +2,15 @@
 
 Living spec. Implement against this document, not against `implementation-proposal.md`.
 
-Muin treats a PDF’s indirect objects as a navigable graph (outgoing refs from the file, incoming refs from a reverse index). **One command core**, three clients:
+Muin treats a PDF’s indirect objects as a navigable graph (outgoing refs from the file, incoming refs from a reverse index). **One command core**, four clients:
 
 | Client | Process | Session |
 |---|---|---|
 | TUI / REPL | `muin file.pdf` | one per CLI process |
-| MCP (CLI) | `muin --mcp file.pdf` | one per CLI process |
+| One-shot CLI | `muin file.pdf <command> …` | open → one verb → close |
+| MCP (CLI) | `muin --mcp` | none until the agent calls `open`; then one worker session |
 | VS Code panel | extension host, library import | one per open PDF webview |
-| VS Code Copilot MCP | vsix `mcp-stdio.js` child (not the CLI binary) | one per connection / PDF |
+| VS Code Copilot MCP | vsix `mcp-stdio.js` child (not the CLI binary) | none until `open`; then one worker session |
 
 The CLI npm package and the VS Code `.vsix` are **independent artifacts**. Each bundles `@muin/core` and `vendor/qpdf/`. Installing one does not install the other.
 
@@ -63,9 +64,8 @@ Same table as the README. `quit` is TUI-only. `export_graph` feeds the VS Code g
 ## VS Code
 
 - Command **Muin: Explore PDF** opens a webview: vis-network graph from `export_graph --depth 2`, click → `cd`, command box → `session.run`.
-- MCP: `contributes.mcpServerDefinitionProviders` + `registerMcpServerDefinitionProvider`. Stdio command is Node + `dist/mcp-stdio.js` + PDF path (last explored file, or a file picker in `resolveMcpServerDefinition`).
-- Panel session and Copilot session are separate.
+- MCP: `contributes.mcpServerDefinitionProviders` + `registerMcpServerDefinitionProvider`. Stdio command is Node + `dist/mcp-stdio.js` with **no** PDF argument. The agent calls `open` / `close`. The panel session is separate from Copilot’s session.
 
 ## Non-goals
 
-Encrypted PDFs, native qpdf, HTTP MCP, spawning the `muin` CLI from the extension, publishing `@muin/core` to npm, compiling qpdf on GitHub Actions, WASM in the webview.
+Encrypted PDFs, native qpdf, HTTP MCP, spawning the `muin` CLI from the extension, publishing `@muin/core` to npm, GitHub Actions, WASM in the webview.
