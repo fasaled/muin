@@ -7,7 +7,9 @@ import {
 } from "../limits.ts";
 import type { PdfAdapter } from "../pdf/adapter.ts";
 import {
+  bracketKind,
   dictGet,
+  displayTypeName,
   formatRef,
   isArray,
   isDict,
@@ -41,6 +43,18 @@ export type Outcome = {
   session: Session;
   result: Result;
 };
+
+export type NeighborEntry = { ref: string; kind?: string; missing?: boolean };
+
+export type Neighbors = {
+  current: NeighborEntry;
+  incoming: { entries: NeighborEntry[]; total: number };
+  outgoing: { entries: NeighborEntry[]; total: number };
+};
+
+// High enough that UIs can scroll through virtually any real neighborhood; still bounded
+// against a pathological object referenced from an enormous number of others.
+export const NEIGHBORS_DEFAULT_LIMIT = 500;
 
 function resolveRef(session: Session, token: string | undefined): PdfRef {
   if (token === undefined) return session.cwd;
@@ -99,6 +113,12 @@ export async function runParsed(
       ].join("\n");
       return { session, result: { kind: "text", text } };
     }
+    case "neighbors": {
+      const ref = resolveRef(session, cmd.ref);
+      getValue(session, ref);
+      const value = buildNeighbors(session, ref, NEIGHBORS_DEFAULT_LIMIT);
+      return { session, result: { kind: "json", value } };
+    }
     case "find": {
       const refs = findObjects(session, cmd.type, cmd.where);
       const text = refs.length === 0 ? "(no matches)" : refs.map(formatRef).join("\n");
@@ -149,11 +169,9 @@ function formatTree(
 ): string {
   const pad = "  ".repeat(indent);
   const key = refKey(ref);
-  if (seen.has(key)) return `${pad}${formatRef(ref)} (cycle)`;
+  if (seen.has(key)) return `${pad}${formatRef(ref)} [cycle]`;
   const value = getValue(session, ref);
-  const type = isDict(value) || isStream(value) ? dictGet(isStream(value) ? value.dict : value, "/Type") : undefined;
-  const typeName = type && type.kind === "name" ? type.value : "";
-  const line = `${pad}${formatRef(ref)} ${typeName}`.trimEnd();
+  const line = `${pad}${formatRef(ref)} ${bracketKind(displayTypeName(value))}`.trimEnd();
   if (depth <= 0) return line;
   const dict = isStream(value) ? value.dict : value;
   const kids = isDict(dict) ? dictGet(dict, "/Kids") : undefined;
@@ -164,6 +182,25 @@ function formatTree(
     .filter(isRef)
     .map((item) => formatTree(session, item.ref, depth - 1, indent + 1, nextSeen));
   return [line, ...childLines].join("\n");
+}
+
+function refEntry(session: Session, ref: PdfRef): NeighborEntry {
+  try {
+    return { ref: formatRef(ref), kind: displayTypeName(getValue(session, ref)) };
+  } catch (err) {
+    if (err instanceof NotFoundError) return { ref: formatRef(ref), missing: true };
+    throw err;
+  }
+}
+
+function buildNeighbors(session: Session, ref: PdfRef, limit: number): Neighbors {
+  const inRefs = incoming(session, ref);
+  const outRefs = outgoingRefs(session, ref);
+  return {
+    current: { ref: formatRef(ref), kind: displayTypeName(getValue(session, ref)) },
+    incoming: { entries: inRefs.slice(0, limit).map((r) => refEntry(session, r)), total: inRefs.length },
+    outgoing: { entries: outRefs.slice(0, limit).map((r) => refEntry(session, r)), total: outRefs.length },
+  };
 }
 
 function danglingRefs(session: Session): PdfRef[] {
@@ -234,7 +271,7 @@ function exportGraph(
       if (err instanceof NotFoundError) return { ref: key, missing: true };
       throw err;
     }
-    return { ref: key, kind: value.kind };
+    return { ref: key, kind: displayTypeName(value) };
   });
   return { nodes, edges };
 }

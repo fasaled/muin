@@ -145,3 +145,11 @@ Each entry: context, decision, consequences.
 **Decision:** `muin completion bash|zsh|fish|powershell` prints a script (`pwsh` is an alias of `powershell`). Completes global flags, `*.pdf` paths, command names, and per-command flags. Does not run qpdf to complete object IDs (too slow for Tab). No `postinstall` hook that edits shell rc files.
 
 **Consequences:** Opt-in install. Completions stay in sync if we regenerate the printed script from the same command list in `completion.ts`.
+
+## D19 — TUI runs in the alternate screen; the overlay scrolls itself
+
+**Context:** The TUI initially rendered inline (Ink's default), which read as a growing terminal transcript rather than an application — the opposite of the fixed-panel, no-log design in this doc's TUI/VS Code section. It also made "muin's box vs. everything else on screen" ambiguous.
+
+**Decision:** `render(<App/>, { alternateScreen: true })` — Ink 7's built-in full-screen mode, the same mechanism `vim`/`htop`/`lazygit` use. The alternate screen has no scrollback, so any content taller than the terminal would otherwise be permanently unreachable; the `Overlay` component compensates by measuring its own height (`measureElement`) and paginating with `↑`/`↓`/`PageUp`/`PageDown` instead of relying on the terminal.
+
+**Consequences:** The terminal's prior contents return unchanged on exit, and the app now has a real screen to lay out (see `docs/design.md`'s "TUI and VS Code UI model": centered, width-capped, vertically distributed via `useStdout`). Every long-output surface (currently only `Overlay`) is responsible for its own scrolling; a future pane that can grow unbounded needs the same treatment, not a plain `<Text>`.

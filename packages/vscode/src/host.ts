@@ -1,9 +1,18 @@
-import { formatBytes, yieldToEventLoop, type CommandResult, type MuinSession } from "@muin/core";
+import {
+  complete,
+  formatBytes,
+  TEXT_PREVIEW_MAX_CHARS,
+  yieldToEventLoop,
+  type CommandResult,
+  type MuinSession,
+  type Neighbors,
+} from "@muin/core";
 
 export const UI_GRAPH_MAX_NODES = 80;
-export const UI_TEXT_MAX_CHARS = 8_000;
+// The overlay's #overlayBody scrolls (CSS overflow: auto), so this is a memory sanity cap, not a screen-space one.
+export const UI_TEXT_MAX_CHARS = TEXT_PREVIEW_MAX_CHARS;
 
-export type WebviewInbound = { type?: string; line?: string; ref?: string };
+export type WebviewInbound = { type?: string; line?: string; ref?: string; cursor?: number };
 
 export type HostState = {
   type: "state";
@@ -14,16 +23,21 @@ export type HostState = {
   graph: unknown;
   ls: string;
   refs: string;
-  log: string;
 };
 
+/** A one-line status/error, shown next to the input and replaced by the next outcome — never appended. */
 export type HostLog = { type: "log"; log: string };
 
-export type HostOutbound = HostState | HostLog;
+/** Result of any command other than cd/back: shown in a dismissible panel over the graph, not a growing log. */
+export type HostOverlay = { type: "overlay"; title: string; body: string };
+
+export type HostCompletions = { type: "completions"; items: string[]; replaceFrom: number };
+
+export type HostOutbound = HostState | HostLog | HostOverlay | HostCompletions;
 
 export function truncateOutput(text: string, max = UI_TEXT_MAX_CHARS): string {
   if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n… truncated ${text.length - max} characters`;
+  return `${text.slice(0, max)}\n[+${text.length - max} more chars]`;
 }
 
 export function formatPanelResult(result: CommandResult): string {
@@ -74,16 +88,24 @@ export function trimGraphForUi(graph: unknown, cwd: string, maxNodes = UI_GRAPH_
   return { nodes: keptNodes, edges: keptEdges };
 }
 
-export function graphMutates(line: string): boolean {
+/** cd/back are the only commands that move the current object — everything else is a query. */
+export function isNavigationCommand(line: string): boolean {
   const cmd = line.trim().split(/\s+/)[0] ?? "";
-  return cmd === "cd" || cmd === "back" || cmd === "find" || cmd === "export_graph";
+  return cmd === "cd" || cmd === "back";
 }
 
 function fileNameOf(path: string): string {
   return path.replace(/^.*[/\\]/, "") || path;
 }
 
-export async function snapshotState(session: MuinSession, log = ""): Promise<HostState> {
+async function neighborRefs(session: MuinSession): Promise<string[]> {
+  const res = await session.run("neighbors");
+  if (res.kind !== "json") return [];
+  const nb = res.value as Neighbors;
+  return [...nb.incoming.entries, ...nb.outgoing.entries].map((e) => e.ref);
+}
+
+export async function snapshotState(session: MuinSession): Promise<HostState> {
   const graph = await session.run("export_graph --depth 2");
   await yieldToEventLoop();
   const ls = await session.run("ls");
@@ -101,23 +123,29 @@ export async function snapshotState(session: MuinSession, log = ""): Promise<Hos
     graph: trimGraphForUi(rawGraph, cwd),
     ls: ls.kind === "text" ? truncateOutput(ls.text, 4_000) : "",
     refs: refs.kind === "text" ? truncateOutput(refs.text, 4_000) : "",
-    log,
   };
 }
 
 export async function handleWebviewMessage(session: MuinSession, msg: WebviewInbound): Promise<HostOutbound> {
   if (msg.type === "ready") {
-    return snapshotState(session, `opened ${fileNameOf(session.filePath)}`);
+    return snapshotState(session);
   }
   if (msg.type === "cd" && msg.ref) {
-    const result = await session.run(`cd ${msg.ref}`);
-    return snapshotState(session, formatPanelResult(result));
+    await session.run(`cd ${msg.ref}`);
+    return snapshotState(session);
   }
   if (msg.type === "run" && msg.line) {
+    if (isNavigationCommand(msg.line)) {
+      await session.run(msg.line);
+      return snapshotState(session);
+    }
     const result = await session.run(msg.line);
-    const text = formatPanelResult(result);
-    if (graphMutates(msg.line)) return snapshotState(session, text);
-    return { type: "log", log: text };
+    return { type: "overlay", title: msg.line, body: formatPanelResult(result) };
+  }
+  if (msg.type === "complete" && msg.line !== undefined && typeof msg.cursor === "number") {
+    const refs = await neighborRefs(session);
+    const result = complete(msg.line, msg.cursor, { neighborRefs: refs });
+    return { type: "completions", items: result.items, replaceFrom: result.replaceFrom };
   }
   return { type: "log", log: "" };
 }

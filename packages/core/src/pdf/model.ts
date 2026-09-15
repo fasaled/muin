@@ -100,19 +100,32 @@ export function collectRefs(value: PdfValue, into: PdfRef[] = []): PdfRef[] {
   return into;
 }
 
+function typeEntry(value: PdfValue): PdfName | undefined {
+  const dict = value.kind === "stream" ? value.dict : value.kind === "dict" ? value : undefined;
+  if (!dict) return undefined;
+  const t = dictGet(dict, "/Type");
+  return t && t.kind === "name" ? t : undefined;
+}
+
+/** Normalized type name for matching (`find --type`): no leading slash, falls back to the structural kind. */
 export function objectTypeName(value: PdfValue): string {
-  if (value.kind === "stream") {
-    const t = dictGet(value.dict, "/Type");
-    if (t && t.kind === "name") return t.value.slice(1);
-    return "Stream";
-  }
-  if (value.kind === "dict") {
-    const t = dictGet(value, "/Type");
-    if (t && t.kind === "name") return t.value.slice(1);
-    return "Dict";
-  }
+  const t = typeEntry(value);
+  if (t) return t.value.slice(1);
+  if (value.kind === "stream") return "Stream";
+  if (value.kind === "dict") return "Dict";
   if (value.kind === "array") return "Array";
   if (value.kind === "name") return "Name";
   if (value.kind === "ref") return "Ref";
   return value.kind === "null" ? "Null" : value.kind === "bool" ? "Bool" : value.kind === "number" ? "Number" : "String";
+}
+
+/** Type name for display: keeps the PDF's own "/Type" syntax (leading slash) instead of normalizing it away. */
+export function displayTypeName(value: PdfValue): string {
+  const t = typeEntry(value);
+  return t ? t.value : objectTypeName(value);
+}
+
+/** Bracket a label that muin generated (a summary, not literal PDF content). Real PDF names (leading "/") pass through. */
+export function bracketKind(name: string): string {
+  return name.startsWith("/") ? name : `[${name}]`;
 }

@@ -84,6 +84,28 @@ describe("runLine", () => {
     }
   });
 
+  test("neighbors returns current node plus capped incoming/outgoing", async () => {
+    const s = await runLine(session(), "cd /Pages");
+    const out = await runLine(s.session, "neighbors");
+    expect(out.result.kind).toBe("json");
+    if (out.result.kind === "json") {
+      const nb = out.result.value as {
+        current: { ref: string; kind?: string };
+        incoming: { entries: unknown[]; total: number };
+        outgoing: { entries: unknown[]; total: number };
+      };
+      expect(nb.current.ref).toBe("3 0 R");
+      expect(nb.current.kind).toBe("/Pages");
+      expect(nb.outgoing.total).toBeGreaterThan(0);
+      expect(nb.outgoing.entries.length).toBeLessThanOrEqual(nb.outgoing.total);
+      expect(nb.incoming.total).toBeGreaterThan(0);
+    }
+  });
+
+  test("neighbors rejects a missing ref", async () => {
+    await expect(runLine(session(), "neighbors 999 0 R")).rejects.toThrow(NotFoundError);
+  });
+
   test("tree terminates and marks a cycle in the page tree", async () => {
     const structure = loadMinimalStructure();
     const page = structure.objects["4 0 R"];
@@ -97,7 +119,7 @@ describe("runLine", () => {
     const out = await runLine(s, "tree --depth 8");
     expect(out.result.kind).toBe("text");
     if (out.result.kind === "text") {
-      expect(out.result.text).toContain("(cycle)");
+      expect(out.result.text).toContain("[cycle]");
     }
   });
 
@@ -134,6 +156,14 @@ describe("runLine", () => {
   test("stream and check require an adapter", async () => {
     await expect(runLine(session(), "stream 5 0 R")).rejects.toThrow(UsageError);
     await expect(runLine(session(), "check")).rejects.toThrow(UsageError);
+  });
+
+  test("stream without a ref reads the current object", async () => {
+    const adapter = fakeAdapter();
+    const atStream = await runLine(session(), "cd 5 0 R", adapter);
+    const out = await runLine(atStream.session, "stream", adapter);
+    expect(out.result.kind).toBe("bytes");
+    if (out.result.kind === "bytes") expect([...out.result.bytes]).toEqual([1, 2, 3, 4]);
   });
 
   test("check reports dangling refs", async () => {

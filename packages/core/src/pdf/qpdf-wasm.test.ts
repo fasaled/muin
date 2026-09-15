@@ -36,7 +36,7 @@ describe.skipIf(!wasmReady)("WasmQpdfAdapter", () => {
     const session = openSession("fixtures/pdf/minimal.pdf", structure);
     const tree = await runLine(session, "tree", adapter);
     expect(tree.result.kind).toBe("text");
-    if (tree.result.kind === "text") expect(tree.result.text).toContain("/Page");
+    if (tree.result.kind === "text") expect(tree.result.text).toContain("Page");
     const check = await runLine(session, "check", adapter);
     expect(check.result.kind).toBe("text");
   });

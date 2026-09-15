@@ -4,8 +4,9 @@ const COMMANDS: Record<string, string> = {
   pwd: "current object and path from /Root",
   back: "previous object in history",
   refs: "outgoing and incoming references",
+  neighbors: "bounded incoming/outgoing neighbors as JSON (for graph UIs)",
   cat: "full object (stream header only, not bytes)",
-  stream: "extract stream bytes (--raw or --decoded, default decoded)",
+  stream: "extract stream bytes of the current (or given) object (--raw or --decoded, default decoded)",
   find: 'search objects (--type required; optional --where "/Key == value")',
   tree: "page tree from /Pages (optional --depth)",
   check: "structural findings (irregular files do not crash)",
@@ -14,12 +15,13 @@ const COMMANDS: Record<string, string> = {
   quit: "leave the session (also: exit, Ctrl+C, Ctrl+D)",
 };
 
-const ORDER = [
+export const COMMAND_NAMES = [
   "ls",
   "cd",
   "pwd",
   "back",
   "refs",
+  "neighbors",
   "cat",
   "stream",
   "find",
@@ -32,8 +34,8 @@ const ORDER = [
 
 export function helpText(command?: string): string {
   if (!command) {
-    const width = Math.max(...ORDER.map((name) => name.length));
-    return ORDER.map((name) => {
+    const width = Math.max(...COMMAND_NAMES.map((name) => name.length));
+    return COMMAND_NAMES.map((name) => {
       const blurb = COMMANDS[name] ?? "";
       return `${name.padEnd(width)}  ${blurb}`;
     }).join("\n");
