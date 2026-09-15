@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { complete } from "./complete.ts";
+import { complete, COMPLETION_MAX_ITEMS } from "./complete.ts";
 
 const ctx = { neighborRefs: ["3 0 R", "4 0 R"] };
 
@@ -33,5 +33,12 @@ describe("complete", () => {
 
   test("completes at the cursor, ignoring text after it", () => {
     expect(complete("cd 3 0 R extra", 4, ctx).items).toEqual(["3 0 R"]);
+  });
+
+  test("caps the item list so a large neighborhood doesn't produce an unusable menu", () => {
+    const manyRefs = Array.from({ length: 50 }, (_, i) => `${i} 0 R`);
+    const result = complete("cd ", 3, { neighborRefs: manyRefs });
+    expect(result.items.length).toBe(COMPLETION_MAX_ITEMS);
+    expect(result.items).toEqual(manyRefs.slice(0, COMPLETION_MAX_ITEMS));
   });
 });

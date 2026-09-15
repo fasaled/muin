@@ -16,6 +16,10 @@ const FLAGS: Record<string, string[]> = {
 
 const REF_ARG_COMMANDS = new Set(["cd", "ls", "cat", "refs", "neighbors", "tree", "stream"]);
 
+/** Cap on returned items — a neighborhood can have up to `NEIGHBORS_DEFAULT_LIMIT` refs; a
+ * completion menu that long isn't usable in either client, so both get the same short list. */
+export const COMPLETION_MAX_ITEMS = 8;
+
 export type CompletionResult = {
   items: string[];
   /** Index in `line` where the completed word starts; splice a chosen item in from here to `cursor`. */
@@ -31,17 +35,20 @@ export function complete(line: string, cursor: number, ctx: CompletionContext): 
   const head = before.slice(0, replaceFrom);
   const tokens = head.trim().split(/\s+/).filter(Boolean);
 
-  if (tokens.length === 0) {
-    const names: readonly string[] = [...COMMAND_NAMES, ...(ctx.extraCommands ?? [])];
-    return { items: names.filter((c) => c.startsWith(partial)), replaceFrom };
-  }
+  const items = (() => {
+    if (tokens.length === 0) {
+      const names: readonly string[] = [...COMMAND_NAMES, ...(ctx.extraCommands ?? [])];
+      return names.filter((c) => c.startsWith(partial));
+    }
+    const cmd = tokens[0] ?? "";
+    if (partial.startsWith("-")) {
+      return (FLAGS[cmd] ?? []).filter((f) => f.startsWith(partial));
+    }
+    if (REF_ARG_COMMANDS.has(cmd)) {
+      return ctx.neighborRefs.filter((r) => r.startsWith(partial));
+    }
+    return [];
+  })();
 
-  const cmd = tokens[0] ?? "";
-  if (partial.startsWith("-")) {
-    return { items: (FLAGS[cmd] ?? []).filter((f) => f.startsWith(partial)), replaceFrom };
-  }
-  if (REF_ARG_COMMANDS.has(cmd)) {
-    return { items: ctx.neighborRefs.filter((r) => r.startsWith(partial)), replaceFrom };
-  }
-  return { items: [], replaceFrom };
+  return { items: items.slice(0, COMPLETION_MAX_ITEMS), replaceFrom };
 }

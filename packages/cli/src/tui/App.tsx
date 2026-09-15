@@ -15,7 +15,6 @@ import { GraphView } from "./GraphView.tsx";
 import { useScrollableText } from "./scroll.ts";
 
 const EXTRA_COMMANDS = ["history"];
-const MENU_MAX = 8;
 const MAX_APP_WIDTH = 100;
 const FOCUS_ORDER = ["prompt", "graph", "object"] as const;
 
@@ -164,7 +163,7 @@ function Prompt({
     () => (menuOpen ? complete(draft, cursor, { neighborRefs, extraCommands: EXTRA_COMMANDS }) : null),
     [menuOpen, draft, cursor, neighborRefs],
   );
-  const menuItems = completion?.items.slice(0, MENU_MAX) ?? [];
+  const menuItems = completion?.items ?? [];
   const clampedMenuIndex = menuItems.length > 0 ? Math.min(menuIndex, menuItems.length - 1) : 0;
 
   const acceptCompletion = useCallback(() => {

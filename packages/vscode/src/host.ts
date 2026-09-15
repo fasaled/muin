@@ -114,11 +114,14 @@ export async function snapshotState(session: MuinSession): Promise<HostState> {
   const snap = session.snapshot();
   const cwd = `${snap.cwd.objectNumber} ${snap.cwd.generation} R`;
   const rawGraph = graph.kind === "json" ? graph.value : { nodes: [], edges: [] };
+  // A ref-jump resets the path to just that ref (see graph/session.ts's cd()) — showing it
+  // again next to cwd is pure duplication, not a breadcrumb, so drop it in that case.
+  const path = snap.path.length === 1 && snap.path[0] === cwd ? [] : snap.path;
   return {
     type: "state",
     fileName: fileNameOf(session.filePath),
     cwd,
-    path: snap.path,
+    path,
     canBack: snap.historyLength > 0,
     graph: trimGraphForUi(rawGraph, cwd),
     ls: ls.kind === "text" ? truncateOutput(ls.text, 4_000) : "",

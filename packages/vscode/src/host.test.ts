@@ -79,6 +79,14 @@ describe("handleWebviewMessage", () => {
     expect(out.canBack).toBe(true);
   });
 
+  test("a ref-jump's path doesn't repeat cwd (no '3 0 R  /  3 0 R' in the header)", async () => {
+    const out = await handleWebviewMessage(session(), { type: "cd", ref: "3 0 R" });
+    expect(out.type).toBe("state");
+    if (out.type !== "state") return;
+    expect(out.cwd).toBe("3 0 R");
+    expect(out.path).toEqual([]);
+  });
+
   test("run pwd opens a dismissible overlay instead of a log", async () => {
     const out = await handleWebviewMessage(session(), { type: "run", line: "pwd" });
     expect(out.type).toBe("overlay");
