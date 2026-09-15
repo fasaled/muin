@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { createSession, formatProcessError, type MuinSession } from "@muin/core";
-import { handleWebviewMessage } from "./host.ts";
+import { handleWebviewMessage, type WebviewInbound } from "./host.ts";
 import { webviewHtml } from "./webview.ts";
 
 const sessions = new Map<string, MuinSession>();
@@ -48,7 +48,7 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
   });
 
   let session: MuinSession | undefined;
-  const pending: { type?: string; line?: string; ref?: string }[] = [];
+  const pending: WebviewInbound[] = [];
   let disposed = false;
   let chain = Promise.resolve();
 
@@ -56,7 +56,7 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
     chain = chain.then(fn, fn);
   };
 
-  const handle = async (msg: { type?: string; line?: string; ref?: string }) => {
+  const handle = async (msg: WebviewInbound) => {
     if (!session) {
       pending.push(msg);
       return;
@@ -71,7 +71,7 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
     }
   };
 
-  panel.webview.onDidReceiveMessage((msg: { type?: string; line?: string; ref?: string }) => {
+  panel.webview.onDidReceiveMessage((msg: WebviewInbound) => {
     enqueue(() => handle(msg));
   });
 
