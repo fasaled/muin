@@ -21,6 +21,6 @@ jobs:
       - run: bun run typecheck
       - run: bun run build
       - name: Smoke CLI on Node
-        run: node dist/cli.js --help
+        run: node packages/cli/dist/cli.js --help
       - name: Smoke CLI on Bun
-        run: bun dist/cli.js --version
+        run: bun packages/cli/dist/cli.js --version

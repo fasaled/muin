@@ -81,3 +81,43 @@ Each entry: context, decision, consequences.
 **Decision:** `docs/design.md`, `docs/decisions.md`, `docs/wasm.md`, and `docs/agents.md` ship in git. User-visible changes update the README in the same change.
 
 **Consequences:** Slightly more to maintain; agents have a required reading list.
+
+## D11 — Private workspace core, two artifacts
+
+**Context:** CLI and VS Code must share commands without the person installing an extra npm package, and without the extension spawning `muin`.
+
+**Decision:** `@muin/core` is a private Bun workspace package. `@fasaled/muin` and the vsix each bundle it. `@muin/core` is not published to npm.
+
+**Consequences:** One version in the repo; both consumers bump together. `createSession` is the only supported way to open a PDF.
+
+## D12 — VS Code MCP is a vsix stdio script
+
+**Context:** VS Code discovers MCP via `McpStdioServerDefinition`, which starts a child process.
+
+**Decision:** The child is `node dist/mcp-stdio.js <pdf>` inside the vsix, calling `serveMcpStdio`. Never the published CLI binary.
+
+**Consequences:** Copilot does not need `mcp.json`. Panel and agent sessions are separate processes/WASM instances.
+
+## D13 — Graph in the webview only
+
+**Context:** qpdf WASM is Node-oriented (`callMain`, MEMFS).
+
+**Decision:** vis-network runs in the webview; the extension host runs `export_graph` / `cd` and posts JSON.
+
+**Consequences:** No WASM in the browser. Click and the command box are two UIs on `session.run`.
+
+## D14 — No qpdf compile on GitHub Actions
+
+**Context:** Docker/emsdk compile of qpdf consumes private-repo Actions minutes.
+
+**Decision:** WASM is vendored and rebuilt locally with Docker. GHA runs tests only.
+
+**Consequences:** Bumping qpdf is a local `docker build` plus a vendor commit.
+
+## D15 — WASM `callMain` on a worker thread
+
+**Context:** `callMain` is synchronous C++ in WASM. On the TUI process it froze the prompt; on the VS Code extension host it stalled the panel’s message loop. It does not run on the editor renderer (already a separate process). Moving it to a worker does not shrink CPU time for qpdf or `JSON.parse`.
+
+**Decision:** `createSession` opens a `worker_threads` Worker that owns the adapter, MEMFS, and graph. The main thread holds a cached `snapshot()` and talks via sequenced RPC (`open` / `run` / `runCommand` / `close`). Tests that do not need WASM keep using `bindSession` in-process. Bundles emit `dist/session-worker.js` beside the CLI and the vsix.
+
+**Consequences:** Opening a PDF is still as slow as qpdf, but the prompt and extension host stay responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API).

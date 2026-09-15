@@ -59,7 +59,7 @@ git clone --depth 1 --branch v12.4.1 https://github.com/qpdf/qpdf.git
    - `--pre-js wasm/js/pre.js` (`noInitialRun`)
    - `--post-js wasm/js/post.js`
 
-Stdout from `callMain` is captured in JS via the module `print` / `printErr` hooks (see `src/pdf/qpdf-wasm.ts`). Never inherit host stdout.
+Stdout from `callMain` is captured in JS via the module `print` / `printErr` hooks as a **list of chunks** (see `src/pdf/qpdf-wasm.ts`). Never inherit host stdout. Structure dumps go to a MEMFS file (`--json … /work/structure.json`) so a large object graph is not concatenated line-by-line on stdout.
 
 ## Outputs
 
@@ -81,7 +81,7 @@ bun test
 
 ## CI
 
-`.github/workflows/wasm.yml` runs when `wasm/**` or `vendor/qpdf/**` changes. It rebuilds the image and fails if the committed vendor files do not match the rebuild (or, on `workflow_dispatch`, uploads artifacts). Review vendor diffs like any other binary change.
+qpdf is **not** compiled on GitHub Actions. Rebuild locally with Docker when you bump pins, then commit `vendor/qpdf/`.
 
 ## Bump procedure
 

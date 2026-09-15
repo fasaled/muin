@@ -1,0 +1,65 @@
+{
+  "name": "muin",
+  "displayName": "Muin",
+  "description": "Explore a PDF’s internal object graph in VS Code. Same command core as the Muin CLI; Copilot gets MCP tools automatically.",
+  "version": "0.0.0",
+  "publisher": "fasaled",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "muin.explorePdf",
+        "title": "Explore PDF",
+        "category": "Muin",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "muin.explorePdf",
+          "when": "resourceExtname == .pdf",
+          "group": "navigation@10"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "muin.explorePdf",
+          "when": "resourceExtname == .pdf",
+          "group": "navigation"
+        }
+      ]
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "muin.mcp",
+        "label": "Muin PDF"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "bun build src/extension.ts --outfile dist/extension.js --target node --format cjs --external vscode && bun build src/mcp-stdio.ts --outfile dist/mcp-stdio.js --target node --format esm && bun build ../core/src/worker/session-worker.ts --outfile dist/session-worker.js --target node --format esm && mkdir -p vendor media && cp -R ../../vendor/qpdf vendor/ && cp node_modules/vis-network/standalone/umd/vis-network.min.js media/vis-network.min.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@muin/core": "workspace:*",
+    "vis-network": "^9.1.9"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/vscode": "^1.101.0"
+  }
+}
