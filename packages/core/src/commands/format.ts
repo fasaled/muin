@@ -1,9 +1,14 @@
 import type { Session } from "../graph/session.ts";
+import { BINARY_PREVIEW_MAX_BYTES, TEXT_PREVIEW_MAX_CHARS } from "../limits.ts";
 import { formatRef, isArray, isDict, isStream, type PdfRef, type PdfValue } from "../pdf/model.ts";
 
 export function formatSnapshot(cwd: { objectNumber: number; generation: number }, path: string[]): string {
+  const ref = formatRef(cwd);
   const trail = path.length > 0 ? path.join(" ") : "";
-  return trail.length > 0 ? `${formatRef(cwd)}  ·  ${trail}` : formatRef(cwd);
+  // A ref-jump resets the path to just that ref (see graph/session.ts's cd()) — showing
+  // it again after "·" is pure duplication, not a breadcrumb, so skip it in that case.
+  if (trail.length === 0 || trail === ref) return ref;
+  return `${ref}  ·  ${trail}`;
 }
 
 export function formatLocation(session: Session): string {
@@ -41,17 +46,17 @@ export function formatValue(value: PdfValue, indent = 0, depth = 0): string {
       return `<<\n${lines.join("\n")}\n${pad}>>`;
     }
     case "stream":
-      return `stream length=${value.length}\n${formatValue(value.dict, indent, depth)}`;
+      return `[stream length=${value.length}]\n${formatValue(value.dict, indent, depth)}`;
   }
 }
 
 export function formatLs(value: PdfValue): string {
   if (isStream(value)) {
-    return `stream\n${formatLs(value.dict)}`;
+    return `[stream]\n${formatLs(value.dict)}`;
   }
   if (isDict(value)) {
     const keys = Object.keys(value.entries).sort();
-    if (keys.length === 0) return "(empty dictionary)";
+    if (keys.length === 0) return "[empty dictionary]";
     const width = Math.max(...keys.map((k) => k.length));
     return keys
       .map((k) => {
@@ -61,12 +66,14 @@ export function formatLs(value: PdfValue): string {
       .join("\n");
   }
   if (isArray(value)) {
-    if (value.items.length === 0) return "(empty array)";
+    if (value.items.length === 0) return "[empty array]";
     return value.items.map((item, i) => `[${i}]  ${preview(item)}`).join("\n");
   }
   return preview(value);
 }
 
+// Square brackets mark a summary muin generated (not literal PDF content): [dict×2], [stream], (none).
+// Real PDF tokens — names, refs, scalar values — are never bracketed.
 function preview(value: PdfValue): string {
   switch (value.kind) {
     case "ref":
@@ -81,28 +88,36 @@ function preview(value: PdfValue): string {
     case "null":
       return "null";
     case "array":
-      return `array[${value.items.length}]`;
+      return `[array×${value.items.length}]`;
     case "dict":
-      return `dict[${Object.keys(value.entries).length}]`;
+      return `[dict×${Object.keys(value.entries).length}]`;
     case "stream":
-      return `stream length=${value.length}`;
+      return `[stream length=${value.length}]`;
   }
 }
 
 export function formatRefList(label: string, refs: PdfRef[]): string {
-  if (refs.length === 0) return `${label}: (none)`;
+  if (refs.length === 0) return `${label}: [none]`;
   return `${label}:\n${refs.map((r) => `  ${formatRef(r)}`).join("\n")}`;
 }
 
-export function formatBytes(bytes: Uint8Array, previewLimit = 256): string {
+// Decoded text pages through the UI's scroll, so its cap is generous; a hex dump of raw
+// binary isn't useful reading past a few KB no matter how much scrolling is available.
+export function formatBytes(bytes: Uint8Array): string {
   const n = bytes.byteLength;
-  const head = `stream  ${n} byte${n === 1 ? "" : "s"}`;
+  const head = `[stream]  ${n} byte${n === 1 ? "" : "s"}`;
   if (n === 0) return head;
-  const slice = bytes.subarray(0, previewLimit);
-  const text = decodeUtf8Preview(slice);
-  const extra = n > previewLimit ? `\n… ${n - previewLimit} more bytes` : "";
-  if (text !== undefined) return `${head}\n${text}${extra}`;
-  return `${head}\n${hexdump(slice)}${extra}`;
+
+  const textCap = Math.min(n, TEXT_PREVIEW_MAX_CHARS);
+  const text = decodeUtf8Preview(bytes.subarray(0, textCap));
+  if (text !== undefined) {
+    const extra = n > textCap ? `\n[+${n - textCap} more bytes]` : "";
+    return `${head}\n${text}${extra}`;
+  }
+
+  const binCap = Math.min(n, BINARY_PREVIEW_MAX_BYTES);
+  const extra = n > binCap ? `\n[+${n - binCap} more bytes]` : "";
+  return `${head}\n${hexdump(bytes.subarray(0, binCap))}${extra}`;
 }
 
 function decodeUtf8Preview(bytes: Uint8Array): string | undefined {

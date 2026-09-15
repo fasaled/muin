@@ -6,8 +6,9 @@ export type ParsedCommand =
   | { name: "pwd" }
   | { name: "back" }
   | { name: "refs"; ref?: string }
+  | { name: "neighbors"; ref?: string }
   | { name: "cat"; ref?: string }
-  | { name: "stream"; ref: string; mode: "raw" | "decoded" }
+  | { name: "stream"; ref?: string; mode: "raw" | "decoded" }
   | { name: "find"; type: string; where?: string }
   | { name: "tree"; ref?: string; depth?: number }
   | { name: "check" }
@@ -105,7 +106,8 @@ export function parseCommand(line: string): ParsedCommand {
   switch (cmd) {
     case "ls":
     case "refs":
-    case "cat": {
+    case "cat":
+    case "neighbors": {
       const extra = positionals(tokens);
       if (extra.length > 1) throw new UsageError(`${cmd} takes at most one ref`);
       const ref = extra[0];
@@ -132,8 +134,13 @@ export function parseCommand(line: string): ParsedCommand {
       const decoded = flagSet(tokens, "--decoded");
       if (raw && decoded) throw new UsageError("stream: choose --raw or --decoded, not both");
       const extra = positionals(tokens);
-      if (extra.length !== 1) throw new UsageError("stream requires a ref");
-      return { name: "stream", ref: extra[0]!, mode: raw ? "raw" : "decoded" };
+      if (extra.length > 1) throw new UsageError("stream takes at most one ref");
+      const ref = extra[0];
+      return {
+        name: "stream",
+        ...(ref === undefined ? {} : { ref }),
+        mode: raw ? "raw" : "decoded",
+      };
     }
     case "find": {
       const type = optFlag(tokens, "--type");

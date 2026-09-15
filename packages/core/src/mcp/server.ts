@@ -93,16 +93,22 @@ export function createMcpServer(options: McpServerOptions = {}): McpServer {
   tool("refs", "Outgoing and incoming references", { ref }, (a) =>
     a.ref ? { name: "refs", ref: String(a.ref) } : { name: "refs" },
   );
+  tool(
+    "neighbors",
+    "Bounded incoming/outgoing neighbors of an object as JSON (current + capped lists with totals)",
+    { ref },
+    (a) => (a.ref ? { name: "neighbors", ref: String(a.ref) } : { name: "neighbors" }),
+  );
   tool("cat", "Show full object (stream header only)", { ref }, (a) =>
     a.ref ? { name: "cat", ref: String(a.ref) } : { name: "cat" },
   );
   tool(
     "stream",
-    "Extract stream bytes (base64 in the tool result)",
-    { ref: z.string(), mode: z.enum(["raw", "decoded"]).optional() },
+    "Extract stream bytes of the current (or given) object (base64 in the tool result)",
+    { ref, mode: z.enum(["raw", "decoded"]).optional() },
     (a) => ({
       name: "stream",
-      ref: String(a.ref),
+      ...(a.ref ? { ref: String(a.ref) } : {}),
       mode: a.mode === "raw" ? "raw" : "decoded",
     }),
   );

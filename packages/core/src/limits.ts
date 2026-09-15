@@ -10,6 +10,10 @@ export const EXPORT_MAX_NODES = 5_000;
 export const TREE_DEFAULT_DEPTH = 3;
 /** Cap on raw stream bytes returned as base64 text over MCP, to keep agent context bounded. */
 export const MCP_STREAM_MAX_BYTES = 2 * 1024 * 1024;
+/** Text preview cap for stream/cat output shown in a UI. Generous: TUI and VS Code panels page through it. */
+export const TEXT_PREVIEW_MAX_CHARS = 500_000;
+/** Hex dump cap for binary stream previews — beyond this, a byte-for-byte hex view isn't useful reading. */
+export const BINARY_PREVIEW_MAX_BYTES = 8 * 1024;
 
 export function assertFileSize(byteLength: number, maxBytes = DEFAULT_MAX_BYTES): void {
   if (byteLength > maxBytes) {

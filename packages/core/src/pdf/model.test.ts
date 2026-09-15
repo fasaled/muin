@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { collectRefs, parseRef, refKey, type PdfDict } from "./model.ts";
+import { collectRefs, displayTypeName, objectTypeName, parseRef, refKey, type PdfDict, type PdfValue } from "./model.ts";
 
 describe("parseRef", () => {
   test("accepts PDF syntax and shortcuts", () => {
@@ -31,5 +31,21 @@ describe("collectRefs", () => {
     };
     const refs = collectRefs(dict);
     expect(refs.map(refKey).sort()).toEqual(["3 0 R", "4 0 R"]);
+  });
+});
+
+describe("objectTypeName vs displayTypeName", () => {
+  const pages: PdfValue = { kind: "dict", entries: { "/Type": { kind: "name", value: "/Pages" } } };
+  const untyped: PdfValue = { kind: "dict", entries: {} };
+
+  test("objectTypeName drops the slash, for find --type matching", () => {
+    expect(objectTypeName(pages)).toBe("Pages");
+    expect(objectTypeName(untyped)).toBe("Dict");
+  });
+
+  test("displayTypeName keeps the PDF's own /Type syntax", () => {
+    expect(displayTypeName(pages)).toBe("/Pages");
+    // No /Type entry: nothing to keep the slash on, falls back like objectTypeName.
+    expect(displayTypeName(untyped)).toBe("Dict");
   });
 });

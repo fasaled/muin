@@ -33,4 +33,24 @@ describe("webviewHtml", () => {
   test("defers graph layout to animation frames", () => {
     expect(html).toContain("requestAnimationFrame");
   });
+
+  test("wires Tab-completion: requests completions and renders the suggestion list", () => {
+    expect(html).toContain('id="suggestions"');
+    expect(html).toContain('postMessage({ type: "complete"');
+    expect(html).toContain('msg.type === "completions"');
+  });
+
+  test("non-navigation results open a dismissible overlay instead of a growing log", () => {
+    expect(html).not.toContain('id="log"');
+    expect(html).toContain('id="overlay"');
+    expect(html).toContain('id="overlayClose"');
+    expect(html).toContain('msg.type === "overlay"');
+    expect(html).toContain('e.key === "Escape" && overlayEl.classList.contains("show")');
+  });
+
+  test("errors show as a single status line, not an appended entry", () => {
+    expect(html).toContain('id="status"');
+    expect(html).toContain('msg.type === "log"');
+    expect(html).toContain("setStatus(msg.log");
+  });
 });

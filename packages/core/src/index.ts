@@ -2,10 +2,13 @@ export { createSession, bindSession, type MuinSession, type SessionOptions, type
 export { parseCommand, type ParsedCommand } from "./commands/parse.ts";
 export { helpText } from "./commands/help.ts";
 export { formatBytes, formatLocation, formatSnapshot } from "./commands/format.ts";
+export type { NeighborEntry, Neighbors } from "./commands/core.ts";
+export { complete, type CompletionContext, type CompletionResult } from "./commands/complete.ts";
+export { TEXT_PREVIEW_MAX_CHARS } from "./limits.ts";
 export { formatProcessError } from "./process-error.ts";
 export { createMcpServer, serveMcpStdio } from "./mcp/server.ts";
 export { UsageError, MuinError, NotFoundError, EncryptedPdfError, CorruptPdfError, LimitError } from "./errors.ts";
 export { vendorPaths } from "./pdf/qpdf-wasm.ts";
 export { yieldToEventLoop } from "./yield.ts";
 export type { PdfRef } from "./pdf/model.ts";
-export { formatRef } from "./pdf/model.ts";
+export { bracketKind, formatRef } from "./pdf/model.ts";

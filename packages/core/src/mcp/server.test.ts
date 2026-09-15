@@ -35,6 +35,7 @@ describe("MCP server", () => {
         "find",
         "help",
         "ls",
+        "neighbors",
         "open",
         "pwd",
         "refs",

@@ -1,26 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { bindSession } from "@muin/core";
 import { fakeAdapter, minimalSession } from "../../core/src/test/helpers.ts";
-import { formatPanelResult, graphMutates, handleWebviewMessage, trimGraphForUi, truncateOutput } from "./host.ts";
+import { formatPanelResult, handleWebviewMessage, isNavigationCommand, trimGraphForUi, truncateOutput } from "./host.ts";
 
 function session() {
   return bindSession(minimalSession("minimal.pdf"), fakeAdapter());
 }
 
-describe("graphMutates", () => {
-  test("navigation and search refresh the graph", () => {
-    expect(graphMutates("cd /Pages")).toBe(true);
-    expect(graphMutates("back")).toBe(true);
-    expect(graphMutates("find --type Page")).toBe(true);
-    expect(graphMutates("export_graph --depth 1")).toBe(true);
+describe("isNavigationCommand", () => {
+  test("cd and back move the current object", () => {
+    expect(isNavigationCommand("cd /Pages")).toBe(true);
+    expect(isNavigationCommand("back")).toBe(true);
   });
 
-  test("inspect commands do not", () => {
-    expect(graphMutates("ls")).toBe(false);
-    expect(graphMutates("pwd")).toBe(false);
-    expect(graphMutates("cat")).toBe(false);
-    expect(graphMutates("check")).toBe(false);
-    expect(graphMutates("help")).toBe(false);
+  test("everything else is a query, shown in the overlay instead", () => {
+    expect(isNavigationCommand("find --type Page")).toBe(false);
+    expect(isNavigationCommand("export_graph --depth 1")).toBe(false);
+    expect(isNavigationCommand("ls")).toBe(false);
+    expect(isNavigationCommand("pwd")).toBe(false);
+    expect(isNavigationCommand("cat")).toBe(false);
+    expect(isNavigationCommand("check")).toBe(false);
+    expect(isNavigationCommand("help")).toBe(false);
   });
 });
 
@@ -32,7 +32,7 @@ describe("truncateOutput", () => {
   test("caps long strings", () => {
     const out = truncateOutput("abcdefghij", 4);
     expect(out.startsWith("abcd")).toBe(true);
-    expect(out).toContain("truncated");
+    expect(out).toContain("more chars");
   });
 });
 
@@ -64,7 +64,6 @@ describe("handleWebviewMessage", () => {
     expect(out.path).toEqual(["/Root"]);
     expect(out.fileName).toBe("minimal.pdf");
     expect(out.canBack).toBe(false);
-    expect(out.log).toContain("opened");
     expect(out.ls).toContain("/Pages");
     const graph = out.graph as { nodes: { ref: string }[] };
     expect(graph.nodes.some((n) => n.ref === "1 0 R")).toBe(true);
@@ -80,11 +79,12 @@ describe("handleWebviewMessage", () => {
     expect(out.canBack).toBe(true);
   });
 
-  test("run pwd logs without replacing the graph payload type", async () => {
+  test("run pwd opens a dismissible overlay instead of a log", async () => {
     const out = await handleWebviewMessage(session(), { type: "run", line: "pwd" });
-    expect(out.type).toBe("log");
-    if (out.type !== "log") return;
-    expect(out.log).toContain("1 0 R");
+    expect(out.type).toBe("overlay");
+    if (out.type !== "overlay") return;
+    expect(out.title).toBe("pwd");
+    expect(out.body).toContain("1 0 R");
   });
 
   test("run cd refreshes state", async () => {
@@ -92,6 +92,35 @@ describe("handleWebviewMessage", () => {
     expect(out.type).toBe("state");
     if (out.type !== "state") return;
     expect(out.cwd).toBe("3 0 R");
+  });
+
+  test("run find opens an overlay and does not touch cwd", async () => {
+    const s = session();
+    const out = await handleWebviewMessage(s, { type: "run", line: "find --type Page" });
+    expect(out.type).toBe("overlay");
+    if (out.type !== "overlay") return;
+    expect(out.title).toBe("find --type Page");
+    expect(out.body).toContain("4 0 R");
+    expect(s.snapshot().cwd).toEqual({ objectNumber: 1, generation: 0 });
+  });
+
+  test("a bad command still throws, for the panel's error handling", async () => {
+    await expect(handleWebviewMessage(session(), { type: "run", line: "cd /NoSuchKey" })).rejects.toThrow();
+  });
+
+  test("complete returns matching command names for the first token", async () => {
+    const out = await handleWebviewMessage(session(), { type: "complete", line: "f", cursor: 1 });
+    expect(out.type).toBe("completions");
+    if (out.type !== "completions") return;
+    expect(out.items).toEqual(["find"]);
+    expect(out.replaceFrom).toBe(0);
+  });
+
+  test("complete returns neighbor refs for a ref-taking command", async () => {
+    const out = await handleWebviewMessage(session(), { type: "complete", line: "cd ", cursor: 3 });
+    expect(out.type).toBe("completions");
+    if (out.type !== "completions") return;
+    expect(out.items).toContain("3 0 R");
   });
 
   test("unknown message is an empty log", async () => {

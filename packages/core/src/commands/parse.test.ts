@@ -39,8 +39,23 @@ describe("parseCommand", () => {
     expect(() => parseCommand("stream 5 0 R --raw --decoded")).toThrow(UsageError);
   });
 
+  test("stream defaults to the current object when no ref is given", () => {
+    expect(parseCommand("stream")).toEqual({ name: "stream", mode: "decoded" });
+    expect(parseCommand("stream --raw")).toEqual({ name: "stream", mode: "raw" });
+    expect(parseCommand("stream 5 0 R --raw")).toEqual({ name: "stream", ref: "5 0 R", mode: "raw" });
+  });
+
+  test("stream rejects more than one ref", () => {
+    expect(() => parseCommand("stream 5 0 R 6 0 R")).toThrow(UsageError);
+  });
+
   test("find requires --type", () => {
     expect(() => parseCommand("find --where /Type==/Page")).toThrow(UsageError);
+  });
+
+  test("neighbors accepts an optional ref", () => {
+    expect(parseCommand("neighbors")).toEqual({ name: "neighbors" });
+    expect(parseCommand("neighbors 4 0 R")).toEqual({ name: "neighbors", ref: "4 0 R" });
   });
 
   test("export_graph flags", () => {

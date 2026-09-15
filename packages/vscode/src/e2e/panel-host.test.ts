@@ -6,7 +6,7 @@ import { handleWebviewMessage } from "../host.ts";
 const wasmReady = existsSync(vendorPaths().wasm);
 
 describe.skipIf(!wasmReady)("VS Code panel host (real PDF)", () => {
-  test("ready → cd via graph click → pwd in the log", async () => {
+  test("ready → cd via graph click → pwd in the overlay", async () => {
     const session = await createSession("fixtures/pdf/minimal.pdf");
     try {
       const ready = await handleWebviewMessage(session, { type: "ready" });
@@ -22,9 +22,9 @@ describe.skipIf(!wasmReady)("VS Code panel host (real PDF)", () => {
       expect(afterCd.cwd).toBe("2 0 R");
 
       const pwd = await handleWebviewMessage(session, { type: "run", line: "pwd" });
-      expect(pwd.type).toBe("log");
-      if (pwd.type !== "log") return;
-      expect(pwd.log).toContain("2 0 R");
+      expect(pwd.type).toBe("overlay");
+      if (pwd.type !== "overlay") return;
+      expect(pwd.body).toContain("2 0 R");
     } finally {
       session.close();
     }
