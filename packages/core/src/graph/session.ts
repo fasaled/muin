@@ -16,12 +16,14 @@ import {
 } from "../pdf/model.ts";
 import { incomingRefs, type ReverseIndex, buildReverseIndex } from "./reverse-index.ts";
 
+export type HistoryEntry = { cwd: PdfRef; path: string[] };
+
 export type Session = {
   filePath: string;
   structure: PdfStructure;
   index: ReverseIndex;
   cwd: PdfRef;
-  history: PdfRef[];
+  history: HistoryEntry[];
   path: string[];
 };
 
@@ -88,7 +90,7 @@ export function cd(session: Session, token: string): Session {
   return {
     ...session,
     cwd: ref,
-    history: [...session.history, session.cwd],
+    history: [...session.history, { cwd: session.cwd, path: session.path }],
     path: jumpedByRef ? [pathStep] : [...session.path, pathStep],
   };
 }
@@ -97,15 +99,15 @@ export function back(session: Session): Session {
   if (session.history.length === 0) {
     throw new NotFoundError("history is empty");
   }
-  const cwd = session.history[session.history.length - 1];
-  if (cwd === undefined) {
+  const entry = session.history[session.history.length - 1];
+  if (entry === undefined) {
     throw new NotFoundError("history is empty");
   }
   return {
     ...session,
-    cwd,
+    cwd: entry.cwd,
     history: session.history.slice(0, -1),
-    path: session.path.length > 1 ? session.path.slice(0, -1) : session.path,
+    path: entry.path,
   };
 }
 

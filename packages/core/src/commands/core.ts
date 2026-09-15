@@ -140,8 +140,16 @@ function pagesRoot(session: Session): PdfRef {
   return session.cwd;
 }
 
-function formatTree(session: Session, ref: PdfRef, depth: number, indent = 0): string {
+function formatTree(
+  session: Session,
+  ref: PdfRef,
+  depth: number,
+  indent = 0,
+  seen: Set<string> = new Set(),
+): string {
   const pad = "  ".repeat(indent);
+  const key = refKey(ref);
+  if (seen.has(key)) return `${pad}${formatRef(ref)} (cycle)`;
   const value = getValue(session, ref);
   const type = isDict(value) || isStream(value) ? dictGet(isStream(value) ? value.dict : value, "/Type") : undefined;
   const typeName = type && type.kind === "name" ? type.value : "";
@@ -150,9 +158,11 @@ function formatTree(session: Session, ref: PdfRef, depth: number, indent = 0): s
   const dict = isStream(value) ? value.dict : value;
   const kids = isDict(dict) ? dictGet(dict, "/Kids") : undefined;
   if (!kids || !isArray(kids)) return line;
+  const nextSeen = new Set(seen);
+  nextSeen.add(key);
   const childLines = kids.items
     .filter(isRef)
-    .map((item) => formatTree(session, item.ref, depth - 1, indent + 1));
+    .map((item) => formatTree(session, item.ref, depth - 1, indent + 1, nextSeen));
   return [line, ...childLines].join("\n");
 }
 

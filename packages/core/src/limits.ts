@@ -8,6 +8,8 @@ export const EXPORT_DEFAULT_DEPTH = 2;
 export const EXPORT_MAX_DEPTH = 8;
 export const EXPORT_MAX_NODES = 5_000;
 export const TREE_DEFAULT_DEPTH = 3;
+/** Cap on raw stream bytes returned as base64 text over MCP, to keep agent context bounded. */
+export const MCP_STREAM_MAX_BYTES = 2 * 1024 * 1024;
 
 export function assertFileSize(byteLength: number, maxBytes = DEFAULT_MAX_BYTES): void {
   if (byteLength > maxBytes) {

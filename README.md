@@ -94,6 +94,10 @@ bun packages/cli/src/cli.ts fixtures/pdf/minimal.pdf
 
 This is a Bun workspace: `packages/core` (private), `packages/cli` (`@fasaled/muin`), `packages/vscode` (extension).
 
+## Development process
+
+Design, decisions, and code are developed in collaboration with AI coding agents (Claude Code). Architectural choices are recorded in [docs/decisions.md](docs/decisions.md) as they're made; [docs/agents.md](docs/agents.md) is the working process the agents follow. Every change is reviewed, tested (`bun test`), and typechecked before it merges.
+
 ## Documentation
 
 | Doc | What it is |

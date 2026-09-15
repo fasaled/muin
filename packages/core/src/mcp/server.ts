@@ -6,13 +6,19 @@ import { createSession, type CommandResult, type MuinSession, type SessionOption
 import type { ParsedCommand } from "../commands/parse.ts";
 import { helpText } from "../commands/help.ts";
 import { UsageError } from "../errors.ts";
+import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
 
 function asText(result: CommandResult): string {
   if (result.kind === "text") return result.text;
   if (result.kind === "json") return JSON.stringify(result.value, null, 2);
   if (result.kind === "bytes") {
+    const total = result.bytes.byteLength;
+    if (total > MCP_STREAM_MAX_BYTES) {
+      const b64 = Buffer.from(result.bytes.subarray(0, MCP_STREAM_MAX_BYTES)).toString("base64");
+      return `base64 (${total} bytes, truncated to ${MCP_STREAM_MAX_BYTES})\n${b64}`;
+    }
     const b64 = Buffer.from(result.bytes).toString("base64");
-    return `base64 (${result.bytes.byteLength} bytes)\n${b64}`;
+    return `base64 (${total} bytes)\n${b64}`;
   }
   return "";
 }
