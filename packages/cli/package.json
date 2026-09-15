@@ -1,0 +1,44 @@
+{
+  "name": "@fasaled/muin",
+  "version": "0.0.0",
+  "description": "A command-line tool (TUI + REPL) that represents the internal structure of a PDF file — indirect objects, streams, page tree, cross-references — as a navigable graph.",
+  "license": "MIT",
+  "type": "module",
+  "author": "Francisco Sánchez <fa.sl@live.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fasaled/muin.git"
+  },
+  "bin": {
+    "muin": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "vendor/qpdf",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile dist/cli.js --target node --format esm --banner '#!/usr/bin/env node' && bun build ../core/src/worker/session-worker.ts --outfile dist/session-worker.js --target node --format esm",
+    "start": "bun src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@muin/core": "workspace:*",
+    "ink": "^7.1.1",
+    "react": "^19.3.0",
+    "react-devtools-core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/react": "^19.3.0",
+    "ink-testing-library": "^4.0.0"
+  }
+}

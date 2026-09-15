@@ -25,10 +25,10 @@ bun install
 bun test
 bun run typecheck
 bun run build
-bun src/cli.ts --help
+bun packages/cli/src/cli.ts --help
 ```
 
-The published CLI still runs on Node (`#!/usr/bin/env node`). After `bun run build`, smoke-test with `node dist/cli.js --help` when you change the entrypoint.
+The published CLI still runs on Node (`#!/usr/bin/env node`). After `bun run build`, smoke-test with `node packages/cli/dist/cli.js --help`.
 
 ## Language
 
@@ -40,27 +40,23 @@ Comments explain non-obvious constraints, not the story of the change.
 
 | Area | Path |
 |---|---|
-| CLI argv / mode | `src/cli.ts` |
-| PDF values | `src/pdf/model.ts` |
-| qpdf JSON | `src/pdf/qpdf-json.ts` |
-| WASM / `callMain` | `src/pdf/qpdf-wasm.ts` |
-| Adapter interface | `src/pdf/adapter.ts` |
-| Reverse index / cwd | `src/graph/` |
-| Verbs | `src/commands/` |
-| Ink UI | `src/tui/` |
-| MCP tools | `src/mcp/` |
-| Caps | `src/limits.ts` |
-| Typed errors | `src/errors.ts` |
+| Session API | `packages/core/src/session.ts` (`createSession` = worker) |
+| In-process session (tests / worker internals) | `packages/core/src/session-local.ts` |
+| WASM worker | `packages/core/src/worker/` |
+| PDF / qpdf / graph / commands / MCP | `packages/core/src/` |
+| CLI argv / TUI | `packages/cli/src/` |
+| VS Code extension | `packages/vscode/src/` |
+| Vendored WASM | `vendor/qpdf/` |
 | Fixtures | `fixtures/` |
 | WASM build | `wasm/` + `docs/wasm.md` |
-| Vendored binary | `vendor/qpdf/` |
 
 ## Adding a command
 
-1. Add the handler and parser in `src/commands` (pure, tested).
-2. Expose it from the TUI help/prompt if it is a TUI verb.
-3. Expose it as an MCP tool if it is an MCP verb.
-4. Update the README command table and `docs/design.md` in the **same** change.
+1. Add the handler and parser in `packages/core/src/commands` (pure, tested).
+2. Expose it from the TUI if it is a TUI verb (`packages/cli`).
+3. MCP tools in `packages/core/src/mcp` pick it up if you add the tool there.
+4. VS Code graph/log uses `session.run` — no second parser.
+5. Update the README command table and `docs/design.md` in the **same** change.
 
 Do not reimplement the verb inside the TUI or MCP.
 
@@ -69,6 +65,7 @@ Do not reimplement the verb inside the TUI or MCP.
 - Depend on a third-party npm qpdf/wasm wrapper.
 - Compile qpdf on the user’s machine at `npm install` time.
 - Start TUI and MCP in the same process.
+- Call `createSession` from the session worker (that would nest workers). Use `createSessionInProcess` there.
 - Dump unbounded graphs from `export_graph`.
 - Eval user `--where` strings as JavaScript.
 - Commit `node_modules/`, `*.tgz`, or build logs.
@@ -79,8 +76,9 @@ Follow [docs/wasm.md](wasm.md) (Docker, pinned URLs, checksums). Bumping qpdf or
 
 ## Tests
 
-- Default: `bun test` (unit, JSON fixtures, no WASM required).
-- WASM integration only when `vendor/qpdf/` exists and the job is meant to load it.
+- Default: `bun test` — unit tests, MCP in-process tests, CLI process tests, and WASM integration when `vendor/qpdf/` is present.
+- `src/**/*.test.ts` next to the code; process-level tests live in `src/e2e/`.
+- WASM integration only when `vendor/qpdf/` exists (`describe.skipIf` otherwise).
 
 ## Publishing
 

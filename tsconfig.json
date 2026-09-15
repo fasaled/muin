@@ -1,20 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2022"],
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "verbatimModuleSyntax": true,
-    "allowImportingTsExtensions": true,
-    "types": ["node"],
-    "jsx": "react-jsx",
-    "rootDir": "."
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/*.test.ts"]
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/cli" }
+  ]
 }

@@ -112,3 +112,7 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Copied into the vsix at build time from repo-root vendor/qpdf
+packages/vscode/vendor/
+packages/vscode/media/
