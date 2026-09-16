@@ -80,7 +80,8 @@ describe("joinCommandLine", () => {
 });
 
 describe("VERSION", () => {
-  test("is the reservation version", () => {
-    expect(VERSION).toBe("0.0.0");
+  test("matches the package version", async () => {
+    const pkg = await Bun.file(new URL("../package.json", import.meta.url)).json();
+    expect(VERSION).toBe(pkg.version);
   });
 });

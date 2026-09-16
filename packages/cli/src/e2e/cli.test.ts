@@ -27,10 +27,11 @@ describe("CLI process", () => {
     expect(stdout).toContain("muin --mcp");
   });
 
-  test("--version prints 0.0.0", async () => {
+  test("--version prints the package version", async () => {
+    const pkg = await Bun.file(new URL("../../package.json", import.meta.url)).json();
     const { stdout, exitCode } = await runCli(["--version"]);
     expect(exitCode).toBe(0);
-    expect(stdout.trim()).toBe("0.0.0");
+    expect(stdout.trim()).toBe(pkg.version);
   });
 
   test("missing file is a usage error", async () => {
