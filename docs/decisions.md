@@ -100,11 +100,11 @@ Each entry: context, decision, consequences.
 
 ## D13 — Graph in the webview only
 
-**Context:** qpdf WASM is Node-oriented (`callMain`, MEMFS).
+**Context:** qpdf WASM is Node-oriented (`callMain`, MEMFS). A vis-network plot of `export_graph` did not match the TUI (neighborhood of the current object) and clicks did not feel like `cd`.
 
-**Decision:** vis-network runs in the webview; the extension host runs `export_graph` / `cd` and posts JSON.
+**Decision:** The webview renders the same `neighbors` + `ls` panes as the TUI (HTML/CSS, no graph library). The extension host runs `neighbors` / `ls` / `cd` and posts JSON. Mouse clicks are `cd`; keyboard matches the TUI.
 
-**Consequences:** No WASM in the browser. Click and the command box are two UIs on `session.run`.
+**Consequences:** No WASM in the browser. No vis-network dependency. `export_graph` remains an MCP / one-shot tool, not the panel’s data source.
 
 ## D14 — No GitHub Actions
 
@@ -120,7 +120,7 @@ Each entry: context, decision, consequences.
 
 **Decision:** `createSession` opens a `worker_threads` Worker that owns the adapter, MEMFS, and graph. The main thread holds a cached `snapshot()` and talks via sequenced RPC (`open` / `run` / `runCommand` / `close`). Tests that do not need WASM keep using `bindSession` in-process. Bundles emit `dist/session-worker.js` beside the CLI and the vsix.
 
-**Consequences:** Opening a PDF is still as slow as qpdf, but the prompt and extension host stay responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API).
+**Consequences:** Opening a PDF is still as slow as qpdf, but the prompt and extension host stay responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API). The VS Code **panel** forks `session-worker.js` as a child (`ELECTRON_RUN_AS_NODE`) instead of `worker_threads`: qpdf WASM aborting in an Electron worker thread takes down the whole window.
 
 ## D16 — MCP is a server; the agent opens and closes PDFs
 
@@ -128,7 +128,7 @@ Each entry: context, decision, consequences.
 
 **Decision:** MCP starts with no PDF. Tools `open` (path, optional maxBytes) and `close` own the worker session. Query tools require an open session (`no PDF is open; call the open tool first`). `open` replaces a previous PDF. One active PDF per MCP process. CLI `muin --mcp` is the normal form; `muin --mcp file.pdf` still pre-opens for scripts. VS Code always advertises MCP without a file picker.
 
-**Consequences:** Copilot can `open` any workspace PDF. TUI and the Explore PDF panel are unchanged. Concurrent PDFs in one MCP connection are out of scope.
+**Consequences:** Copilot can `open` any workspace PDF. In VS Code, `open` with no path (and the `focused` tool) use the PDF in the active tab, or the file already in the Muin panel — the extension writes that path to a hint file the MCP child reads. TUI is unchanged. Concurrent PDFs in one MCP connection are out of scope.
 
 ## D17 — One-shot CLI commands
 

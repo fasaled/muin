@@ -1,6 +1,7 @@
 import {
   complete,
   formatBytes,
+  formatSnapshot,
   TEXT_PREVIEW_MAX_CHARS,
   yieldToEventLoop,
   type CommandResult,
@@ -8,7 +9,6 @@ import {
   type Neighbors,
 } from "@muin/core";
 
-export const UI_GRAPH_MAX_NODES = 80;
 // The overlay's #overlayBody scrolls (CSS overflow: auto), so this is a memory sanity cap, not a screen-space one.
 export const UI_TEXT_MAX_CHARS = TEXT_PREVIEW_MAX_CHARS;
 
@@ -19,10 +19,10 @@ export type HostState = {
   fileName: string;
   cwd: string;
   path: string[];
+  location: string;
   canBack: boolean;
-  graph: unknown;
+  neighbors: Neighbors;
   ls: string;
-  refs: string;
 };
 
 /** A one-line status/error, shown next to the input and replaced by the next outcome — never appended. */
@@ -47,47 +47,6 @@ export function formatPanelResult(result: CommandResult): string {
   return "";
 }
 
-export type GraphPayload = { nodes: { ref: string; kind?: string }[]; edges: { from: string; to: string }[] };
-
-export function trimGraphForUi(graph: unknown, cwd: string, maxNodes = UI_GRAPH_MAX_NODES): GraphPayload {
-  const raw = graph as { nodes?: { ref: string; kind?: string }[]; edges?: { from: string; to: string }[] };
-  const nodes = raw.nodes ?? [];
-  const edges = raw.edges ?? [];
-  if (nodes.length <= maxNodes) {
-    return { nodes, edges };
-  }
-  const byId = new Map(nodes.map((n) => [n.ref, n]));
-  const adj = new Map<string, string[]>();
-  for (const e of edges) {
-    const list = adj.get(e.from) ?? [];
-    list.push(e.to);
-    adj.set(e.from, list);
-    const back = adj.get(e.to) ?? [];
-    back.push(e.from);
-    adj.set(e.to, back);
-  }
-  const keep = new Set<string>();
-  const queue = [cwd];
-  if (byId.has(cwd)) keep.add(cwd);
-  else if (nodes[0]) {
-    keep.add(nodes[0].ref);
-    queue[0] = nodes[0].ref;
-  }
-  while (queue.length > 0 && keep.size < maxNodes) {
-    const id = queue.shift();
-    if (id === undefined) break;
-    for (const next of adj.get(id) ?? []) {
-      if (keep.has(next)) continue;
-      keep.add(next);
-      queue.push(next);
-      if (keep.size >= maxNodes) break;
-    }
-  }
-  const keptNodes = nodes.filter((n) => keep.has(n.ref));
-  const keptEdges = edges.filter((e) => keep.has(e.from) && keep.has(e.to));
-  return { nodes: keptNodes, edges: keptEdges };
-}
-
 /** cd/back are the only commands that move the current object — everything else is a query. */
 export function isNavigationCommand(line: string): boolean {
   const cmd = line.trim().split(/\s+/)[0] ?? "";
@@ -98,34 +57,42 @@ function fileNameOf(path: string): string {
   return path.replace(/^.*[/\\]/, "") || path;
 }
 
-async function neighborRefs(session: MuinSession): Promise<string[]> {
-  const res = await session.run("neighbors");
-  if (res.kind !== "json") return [];
-  const nb = res.value as Neighbors;
+function emptyNeighbors(cwd: string): Neighbors {
+  return {
+    current: { ref: cwd },
+    incoming: { entries: [], total: 0 },
+    outgoing: { entries: [], total: 0 },
+  };
+}
+
+function neighborsOf(result: CommandResult, cwd: string): Neighbors {
+  if (result.kind !== "json" || result.value === null || typeof result.value !== "object") {
+    return emptyNeighbors(cwd);
+  }
+  return result.value as Neighbors;
+}
+
+function neighborRefsOf(nb: Neighbors): string[] {
   return [...nb.incoming.entries, ...nb.outgoing.entries].map((e) => e.ref);
 }
 
 export async function snapshotState(session: MuinSession): Promise<HostState> {
-  const graph = await session.run("export_graph --depth 2");
+  const nbRes = await session.run("neighbors");
   await yieldToEventLoop();
   const ls = await session.run("ls");
-  await yieldToEventLoop();
-  const refs = await session.run("refs");
   const snap = session.snapshot();
   const cwd = `${snap.cwd.objectNumber} ${snap.cwd.generation} R`;
-  const rawGraph = graph.kind === "json" ? graph.value : { nodes: [], edges: [] };
-  // A ref-jump resets the path to just that ref (see graph/session.ts's cd()) — showing it
-  // again next to cwd is pure duplication, not a breadcrumb, so drop it in that case.
   const path = snap.path.length === 1 && snap.path[0] === cwd ? [] : snap.path;
+  const neighbors = neighborsOf(nbRes, cwd);
   return {
     type: "state",
     fileName: fileNameOf(session.filePath),
     cwd,
     path,
+    location: formatSnapshot(snap.cwd, path),
     canBack: snap.historyLength > 0,
-    graph: trimGraphForUi(rawGraph, cwd),
+    neighbors,
     ls: ls.kind === "text" ? truncateOutput(ls.text, 4_000) : "",
-    refs: refs.kind === "text" ? truncateOutput(refs.text, 4_000) : "",
   };
 }
 
@@ -146,8 +113,13 @@ export async function handleWebviewMessage(session: MuinSession, msg: WebviewInb
     return { type: "overlay", title: msg.line, body: formatPanelResult(result) };
   }
   if (msg.type === "complete" && msg.line !== undefined && typeof msg.cursor === "number") {
-    const refs = await neighborRefs(session);
-    const result = complete(msg.line, msg.cursor, { neighborRefs: refs });
+    const nbRes = await session.run("neighbors");
+    const snap = session.snapshot();
+    const cwd = `${snap.cwd.objectNumber} ${snap.cwd.generation} R`;
+    const result = complete(msg.line, msg.cursor, {
+      neighborRefs: neighborRefsOf(neighborsOf(nbRes, cwd)),
+      extraCommands: ["history"],
+    });
     return { type: "completions", items: result.items, replaceFrom: result.replaceFrom };
   }
   return { type: "log", log: "" };

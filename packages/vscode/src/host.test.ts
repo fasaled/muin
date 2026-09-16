@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { bindSession } from "@muin/core";
 import { fakeAdapter, minimalSession } from "../../core/src/test/helpers.ts";
-import { formatPanelResult, handleWebviewMessage, isNavigationCommand, trimGraphForUi, truncateOutput } from "./host.ts";
+import { formatPanelResult, handleWebviewMessage, isNavigationCommand, truncateOutput } from "./host.ts";
 
 function session() {
   return bindSession(minimalSession("minimal.pdf"), fakeAdapter());
@@ -36,16 +36,6 @@ describe("truncateOutput", () => {
   });
 });
 
-describe("trimGraphForUi", () => {
-  test("keeps a neighborhood around cwd", () => {
-    const nodes = Array.from({ length: 20 }, (_, i) => ({ ref: `${i} 0 R` }));
-    const edges = Array.from({ length: 19 }, (_, i) => ({ from: `${i} 0 R`, to: `${i + 1} 0 R` }));
-    const trimmed = trimGraphForUi({ nodes, edges }, "0 0 R", 5);
-    expect(trimmed.nodes.length).toBeLessThanOrEqual(5);
-    expect(trimmed.nodes.some((n) => n.ref === "0 0 R")).toBe(true);
-  });
-});
-
 describe("formatPanelResult", () => {
   test("text, json, bytes, quit", () => {
     expect(formatPanelResult({ kind: "text", text: "ok" })).toBe("ok");
@@ -65,8 +55,9 @@ describe("handleWebviewMessage", () => {
     expect(out.fileName).toBe("minimal.pdf");
     expect(out.canBack).toBe(false);
     expect(out.ls).toContain("/Pages");
-    const graph = out.graph as { nodes: { ref: string }[] };
-    expect(graph.nodes.some((n) => n.ref === "1 0 R")).toBe(true);
+    expect(out.location).toContain("1 0 R");
+    expect(out.neighbors.current.ref).toBe("1 0 R");
+    expect(out.neighbors.outgoing.total).toBeGreaterThan(0);
   });
 
   test("cd updates cwd", async () => {
@@ -77,6 +68,7 @@ describe("handleWebviewMessage", () => {
     if (out.type !== "state") return;
     expect(out.cwd).toBe("3 0 R");
     expect(out.canBack).toBe(true);
+    expect(out.neighbors.current.ref).toBe("3 0 R");
   });
 
   test("a ref-jump's path doesn't repeat cwd (no '3 0 R  /  3 0 R' in the header)", async () => {
@@ -122,6 +114,13 @@ describe("handleWebviewMessage", () => {
     if (out.type !== "completions") return;
     expect(out.items).toEqual(["find"]);
     expect(out.replaceFrom).toBe(0);
+  });
+
+  test("complete includes the client-only history command", async () => {
+    const out = await handleWebviewMessage(session(), { type: "complete", line: "h", cursor: 1 });
+    expect(out.type).toBe("completions");
+    if (out.type !== "completions") return;
+    expect(out.items).toContain("history");
   });
 
   test("complete returns neighbor refs for a ref-taking command", async () => {

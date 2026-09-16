@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { basename } from "node:path";
 import * as vscode from "vscode";
 import { createSession, formatProcessError, type MuinSession } from "@muin/core";
@@ -35,14 +36,11 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
     {
       enableScripts: true,
       retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "media")],
     },
   );
   panels.set(pdfPath, panel);
 
-  const vis = panel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, "media", "vis-network.min.js"));
   panel.webview.html = webviewHtml({
-    visScript: vis.toString(),
     nonce: nonce(),
     cspSource: panel.webview.cspSource,
   });
@@ -85,7 +83,11 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
   context.subscriptions.push(panel);
 
   try {
-    session = sessions.get(pdfPath) ?? (await createSession(pdfPath));
+    const workerScript = context.asAbsolutePath("dist/session-worker.js");
+    if (!existsSync(workerScript)) {
+      throw new Error(`Muin session worker missing at ${workerScript}; rebuild the VS Code extension`);
+    }
+    session = sessions.get(pdfPath) ?? (await createSession(pdfPath, { workerScript, workerProcess: true }));
     if (disposed) {
       session.close();
       return;

@@ -50,13 +50,12 @@
     ]
   },
   "scripts": {
-    "build": "bun build src/extension.ts --outfile dist/extension.js --target node --format cjs --external vscode && bun build src/mcp-stdio.ts --outfile dist/mcp-stdio.js --target node --format esm && bun build ../core/src/worker/session-worker.ts --outfile dist/session-worker.js --target node --format esm && mkdir -p vendor media && cp -R ../../vendor/qpdf vendor/ && cp node_modules/vis-network/standalone/umd/vis-network.min.js media/vis-network.min.js",
+    "build": "bun build src/extension.ts --outfile dist/extension.js --target node --format cjs --external vscode && bun build src/mcp-stdio.ts --outfile dist/mcp-stdio.js --target node --format esm && bun build ../core/src/worker/session-worker.ts --outfile dist/session-worker.js --target node --format esm && mkdir -p vendor && cp -R ../../vendor/qpdf vendor/",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test"
   },
   "dependencies": {
-    "@muin/core": "workspace:*",
-    "vis-network": "^9.1.9"
+    "@muin/core": "workspace:*"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -7,6 +8,23 @@ import type { ParsedCommand } from "../commands/parse.ts";
 import { helpText } from "../commands/help.ts";
 import { UsageError } from "../errors.ts";
 import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
+
+/** Env file the VS Code extension updates with the PDF in the active tab / Muin panel. */
+export const MUIN_FOCUSED_PDF_FILE = "MUIN_FOCUSED_PDF_FILE";
+
+export function readFocusedPdfPath(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const hint = env[MUIN_FOCUSED_PDF_FILE];
+  if (hint) {
+    try {
+      const text = readFileSync(hint, "utf8").trim();
+      if (text.length > 0) return text;
+    } catch {
+      // missing or unreadable
+    }
+  }
+  const snap = env.MUIN_FOCUSED_PDF?.trim();
+  return snap && snap.length > 0 ? snap : undefined;
+}
 
 function asText(result: CommandResult): string {
   if (result.kind === "text") return result.text;
@@ -30,6 +48,7 @@ function textResult(text: string, isError = false) {
 export type McpServerOptions = {
   openSession?: (path: string, options?: SessionOptions) => Promise<MuinSession>;
   session?: MuinSession;
+  focusedPdf?: () => string | undefined;
 };
 
 export function createMcpServer(options: McpServerOptions = {}): McpServer {
@@ -44,12 +63,28 @@ export function createMcpServer(options: McpServerOptions = {}): McpServer {
     return session;
   };
 
+  const focusedPath = (): string | undefined => options.focusedPdf?.() ?? readFocusedPdfPath();
+
+  server.tool(
+    "focused",
+    "The PDF currently focused in VS Code (active editor tab if it is a PDF, otherwise the file open in the Muin panel). Empty if none. Call this to see or suggest that file; then open it with the open tool.",
+    {},
+    async () => {
+      const p = focusedPath();
+      return textResult(p ?? "no PDF is focused in VS Code");
+    },
+  );
+
   server.tool(
     "open",
-    "Open a PDF and start a navigation session. Closes any PDF already open. Later tools (ls, cd, find, …) operate on this file until close.",
-    { path: z.string(), maxBytes: z.number().positive().optional() },
+    "Open a PDF and start a navigation session. Closes any PDF already open. Later tools (ls, cd, find, …) operate on this file until close. In VS Code, omit path to open the focused PDF (active tab or Muin panel).",
+    { path: z.string().optional(), maxBytes: z.number().positive().optional() },
     async (args) => {
-      const filePath = resolve(String(args.path));
+      const raw = args.path === undefined || String(args.path).trim() === "" ? focusedPath() : String(args.path);
+      if (!raw) {
+        throw new UsageError("open needs a path, or a PDF focused in VS Code (active tab / Muin panel)");
+      }
+      const filePath = resolve(raw);
       session?.close();
       session = undefined;
       const opts: SessionOptions = args.maxBytes === undefined ? {} : { maxBytes: args.maxBytes };
@@ -149,10 +184,13 @@ export function createMcpServer(options: McpServerOptions = {}): McpServer {
   );
   server.tool("help", "Command help, including MCP open/close", { command: z.string().optional() }, async (args) => {
     const extra =
-      "open   open a PDF by path (starts or replaces the session)\nclose  close the current PDF session";
+      "open     open a PDF by path, or the focused VS Code PDF if path is omitted\nclose    close the current PDF session\nfocused  path of the PDF focused in VS Code, if any";
     const cmd = args.command === undefined ? undefined : String(args.command);
-    if (cmd === "open") return textResult("open  open a PDF by path and start a session (closes any previous PDF)");
+    if (cmd === "open") {
+      return textResult("open  open a PDF by path (omit path in VS Code to use the focused editor / Muin panel)");
+    }
     if (cmd === "close") return textResult("close  close the current PDF session");
+    if (cmd === "focused") return textResult("focused  path of the PDF focused in VS Code (active tab or Muin panel)");
     return textResult(`${helpText(cmd)}\n${cmd ? "" : extra}`.trim());
   });
 

@@ -121,10 +121,11 @@ function tryReadFile(fs: QpdfFS, path: string): Uint8Array | undefined {
 export class WasmQpdfAdapter implements PdfAdapter {
   private structure: PdfStructure | undefined;
   private inPath = "/work/input.pdf";
+  private readonly loaded: Awaited<ReturnType<typeof loadQpdfModule>>;
 
-  constructor(
-    private readonly loaded: Awaited<ReturnType<typeof loadQpdfModule>>,
-  ) {}
+  constructor(loaded: Awaited<ReturnType<typeof loadQpdfModule>>) {
+    this.loaded = loaded;
+  }
 
   static async create(create?: CreateQpdf): Promise<WasmQpdfAdapter> {
     return new WasmQpdfAdapter(await loadQpdfModule(create));

@@ -6,7 +6,7 @@ export type { NeighborEntry, Neighbors } from "./commands/core.ts";
 export { complete, type CompletionContext, type CompletionResult } from "./commands/complete.ts";
 export { TEXT_PREVIEW_MAX_CHARS } from "./limits.ts";
 export { formatProcessError } from "./process-error.ts";
-export { createMcpServer, serveMcpStdio } from "./mcp/server.ts";
+export { createMcpServer, serveMcpStdio, readFocusedPdfPath, MUIN_FOCUSED_PDF_FILE } from "./mcp/server.ts";
 export { UsageError, MuinError, NotFoundError, EncryptedPdfError, CorruptPdfError, LimitError } from "./errors.ts";
 export { vendorPaths } from "./pdf/qpdf-wasm.ts";
 export { yieldToEventLoop } from "./yield.ts";

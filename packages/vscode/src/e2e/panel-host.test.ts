@@ -13,18 +13,20 @@ describe.skipIf(!wasmReady)("VS Code panel host (real PDF)", () => {
       expect(ready.type).toBe("state");
       if (ready.type !== "state") return;
       expect(ready.cwd).toMatch(/1 0 R/);
-      const pages = (ready.graph as { nodes: { ref: string }[] }).nodes.find((n) => n.ref !== "1 0 R");
-      expect(pages).toBeDefined();
+      expect(ready.neighbors.current.ref).toMatch(/1 0 R/);
+      const hop = ready.neighbors.outgoing.entries.find((e) => e.ref !== ready.cwd);
+      expect(hop).toBeDefined();
+      if (!hop) return;
 
-      const afterCd = await handleWebviewMessage(session, { type: "cd", ref: "2 0 R" });
+      const afterCd = await handleWebviewMessage(session, { type: "cd", ref: hop.ref });
       expect(afterCd.type).toBe("state");
       if (afterCd.type !== "state") return;
-      expect(afterCd.cwd).toBe("2 0 R");
+      expect(afterCd.cwd).toBe(hop.ref);
 
       const pwd = await handleWebviewMessage(session, { type: "run", line: "pwd" });
       expect(pwd.type).toBe("overlay");
       if (pwd.type !== "overlay") return;
-      expect(pwd.body).toContain("2 0 R");
+      expect(pwd.body).toContain(hop.ref);
     } finally {
       session.close();
     }

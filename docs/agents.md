@@ -66,6 +66,7 @@ Do not reimplement the verb inside the TUI or MCP.
 - Compile qpdf on the user’s machine at `npm install` time.
 - Start TUI and MCP in the same process.
 - Call `createSession` from the session worker (that would nest workers). Use `createSessionInProcess` there.
+- Run qpdf WASM on a `worker_threads` Worker inside the VS Code extension host. The panel must `fork` the session worker (`workerProcess: true`).
 - Dump unbounded graphs from `export_graph`.
 - Eval user `--where` strings as JavaScript.
 - Commit `node_modules/`, `*.tgz`, or build logs.
