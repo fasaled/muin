@@ -55,11 +55,11 @@ Streams are fetched on demand.
 
 ## Commands
 
-Same table as the README. `quit` is TUI-only. `export_graph` feeds the VS Code graph and MCP.
+Same table as the README. `quit` is TUI-only. `export_graph` feeds MCP; the VS Code panel uses `neighbors` like the TUI.
 
 `find --where`: `/Key == value`, `!=`, `>`, `<`, optional AND. No JS eval.
 
-`export_graph`: default depth 2, max 8, max 5_000 nodes; or `--find` (nodes matching the where, edges among them).
+`export_graph`: default depth 2, max 8, max 5_000 nodes; or `--find` (nodes matching the where, edges among them). MCP / one-shot JSON; the VS Code panel uses `neighbors`, same as the TUI.
 
 `neighbors`: current object plus its incoming and outgoing refs, each capped (default 8) with a total count. JSON, machine-readable pair of `refs`. Feeds the CLI TUI's graph panel; keyboard-navigable there (`Tab` to focus it, arrows to pick a neighbor, `Enter` = `cd`).
 
@@ -67,7 +67,7 @@ Same table as the README. `quit` is TUI-only. `export_graph` feeds the VS Code g
 
 Both clients follow the same interaction model, in their own idioms, so the experience matches across surfaces even though the rendering is unrelated:
 
-- **State panes** show the current object and never scroll: they redraw in place on `cd`/`back`. TUI: a graph panel (`neighbors`) plus an object panel (`ls`). VS Code: the vis-network graph plus the `#ls`/`#refs` panes.
+- **State panes** show the current object and never scroll: they redraw in place on `cd`/`back`. Both clients: a graph panel (`neighbors`: incoming / current / outgoing) plus an object panel (`ls`). VS Code adds mouse: click a neighbor or a ref in `ls` to `cd`.
 - **Everything else is transient.** Any command that isn't `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, …) shows its result in a panel that replaces the state panes and is dismissed explicitly — `Esc` (both clients) or the panel's own close button (VS Code only, since the TUI has no mouse). `cd`/`back` always dismiss it and refresh the state panes.
 - **The panel scrolls; the terminal doesn't.** The TUI runs in the alternate screen (no scrollback — see D19), so content taller than the screen would otherwise be unreachable. The TUI's `Overlay` (`App.tsx`) measures its own rendered height with `measureElement` and renders only that many lines, moved by `↑`/`↓`/`PageUp`/`PageDown`, with a `first-last/total` counter. VS Code's overlay gets this for free from the browser (`overflow: auto` in `webview.ts`).
 - There is no growing transcript in either client. Errors are a single status line, replaced by the next outcome, not appended to history. VS Code's host distinguishes the two over the wire: a `state`/`overlay` message replaces panel content, a `log` message is always an error or empty (`host.ts`'s `HostLog`), never used for command output.
@@ -79,8 +79,8 @@ Both clients follow the same interaction model, in their own idioms, so the expe
 
 ## VS Code
 
-- Command **Muin: Explore PDF** opens a webview: vis-network graph from `export_graph --depth 2`, click → `cd`, command box → `session.run`.
-- MCP: `contributes.mcpServerDefinitionProviders` + `registerMcpServerDefinitionProvider`. Stdio command is Node + `dist/mcp-stdio.js` with **no** PDF argument. The agent calls `open` / `close`. The panel session is separate from Copilot’s session.
+- Command **Muin: Explore PDF** opens a webview that mirrors the TUI: `neighbors` neighborhood (incoming / current / outgoing), `ls` object pane, command box → `session.run`. Click a neighbor or a ref in `ls` to `cd`; keyboard matches the TUI (`Tab` / arrows / `Enter` / `Esc`).
+- MCP: `contributes.mcpServerDefinitionProviders` + `registerMcpServerDefinitionProvider`. Stdio command is Node + `dist/mcp-stdio.js` with **no** PDF argument. The agent calls `open` / `close`. `open` may omit `path` to use the focused VS Code PDF (active tab if it is a `.pdf`, else the Muin panel file); `focused` returns that path so the agent can suggest it. The panel session is separate from Copilot’s session.
 
 ## Non-goals
 

@@ -25,7 +25,7 @@ The extension only runs built (`dist/extension.js`, `dist/mcp-stdio.js`, `dist/s
 
 1. Open this repo's root folder in VS Code.
 2. Press `F5` (or Run and Debug → "Run Muin extension"). This runs the `muin: build vscode extension` task first, then opens a second VS Code window with the extension loaded, workspace-rooted at `fixtures/pdf/`.
-3. In that window: right-click `minimal.pdf` in the Explorer → **Muin: Explore PDF**, or use the Command Palette. Reload the dev host window (`Cmd+R` / `Ctrl+R`) after code changes; there is no hot reload, so re-run the build task first if you only edited `.ts` files (the `F5` launch does this for you, but a manual reload does not).
+3. In that window: right-click `minimal.pdf` in the Explorer → **Muin: Explore PDF**, or use the Command Palette (`Muin: Explore PDF`). A tab titled `Muin: minimal.pdf` opens **beside** the editor — there is no Activity Bar icon. If opening fails, VS Code shows an error toast. Reload the dev host window (`Cmd+R` / `Ctrl+R`) after code changes; there is no hot reload, so re-run the build task first if you only edited `.ts` files (the `F5` launch does this for you, but a manual reload does not).
 4. To test Copilot's MCP integration, open Copilot Chat in agent mode in the dev host window — it should discover the `muin.mcp` server without any `mcp.json` edit and can `open` a workspace PDF itself.
 
 **Packaged `.vsix` (closer to what users install):**
@@ -37,4 +37,4 @@ bunx @vscode/vsce package --no-dependencies
 code --install-extension muin-0.0.0.vsix
 ```
 
-Use this before a release, or when a bug might be specific to packaging (vendored `vendor/qpdf/`, `media/vis-network.min.js`, or path resolution that differs between the dev host and an installed `.vsix`). Uninstall with **Extensions → Muin → Uninstall** when done.
+Use this before a release, or when a bug might be specific to packaging (vendored `vendor/qpdf/`, or path resolution that differs between the dev host and an installed `.vsix`). Uninstall with **Extensions → Muin → Uninstall** when done.

@@ -62,19 +62,20 @@ Typing a partial command, flag, or ref and pressing `Tab` opens a completion men
 
 Requires Node.js 18+. If stdin is not a TTY, the CLI uses a line-oriented REPL instead of Ink. Encrypted PDFs are not supported.
 
-MCP is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. The TUI still takes the file on the command line. One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit — useful in scripts; they do not keep `cd` state.
+MCP is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. In VS Code, `open` may omit the path to use the focused PDF (the active tab if it is a `.pdf`, otherwise the file in the Muin panel); `focused` returns that path. The TUI still takes the file on the command line. One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit — useful in scripts; they do not keep `cd` state.
 
 ## VS Code
 
-Install the **Muin** extension. Run **Muin: Explore PDF**, pick a file. Like the TUI, the panel keeps the graph and the current object always visible and never scrolling; any command other than `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, …) opens its result in a panel over the graph, closed with `Esc` or its own close button. The command box has the same `Tab` completion as the TUI. Copilot agent mode discovers Muin’s MCP tools without editing `mcp.json` and should `open` a workspace PDF itself. The extension does **not** spawn the `muin` CLI; it bundles the core and qpdf WASM in the `.vsix`.
+Install the **Muin** extension. Run **Muin: Explore PDF**, pick a file. The panel is the TUI laid out in the editor: incoming / current / outgoing neighbors, the current object (`ls`), and the same command box. Click a neighbor (or a ref in the object pane) to `cd`; `Tab` / arrows / `Enter` / `Esc` match the TUI. Any command other than `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, …) opens its result in a panel over the graph, closed with `Esc` or its own close button. Copilot agent mode discovers Muin’s MCP tools without editing `mcp.json` and should `open` a workspace PDF itself. The extension does **not** spawn the `muin` CLI; it bundles the core and qpdf WASM in the `.vsix`.
 
 ## Commands
 
 | Command | TUI | MCP | VS Code |
 |---|---|---|---|
 | `ls` `cd` `pwd` `back` `refs` `neighbors` `cat` `stream` `find` `tree` `check` `help` | yes | yes | yes |
-| `open` / `close` | no | yes | MCP only |
-| `export_graph` | JSON text | yes | feeds the graph |
+| `open` / `close` | no | yes | MCP only (`open` can omit path → focused PDF) |
+| `focused` | no | yes (VS Code) | MCP: path of the focused PDF |
+| `export_graph` | JSON text | yes | MCP / one-shot (panel uses `neighbors`) |
 | `quit` / `exit` | yes | no | close the panel |
 
 `cd` accepts `O G R`, `O,G`, a dictionary key (`/Pages`), or an array index.

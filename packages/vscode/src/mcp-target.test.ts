@@ -9,4 +9,11 @@ describe("mcpStdioInvocation", () => {
     expect(inv.args).toEqual(["/ext/dist/mcp-stdio.js"]);
     expect(inv.args.join(" ")).not.toContain("muin --mcp");
   });
+
+  test("can pass the focused-PDF hint file in the child env", () => {
+    const inv = mcpStdioInvocation("/usr/bin/node", "/ext/dist/mcp-stdio.js", {
+      MUIN_FOCUSED_PDF_FILE: "/tmp/focused-pdf",
+    });
+    expect(inv.env).toEqual({ MUIN_FOCUSED_PDF_FILE: "/tmp/focused-pdf" });
+  });
 });

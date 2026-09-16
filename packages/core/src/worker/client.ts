@@ -1,3 +1,4 @@
+import { fork, type ChildProcess } from "node:child_process";
 import { Worker } from "node:worker_threads";
 import {
   CorruptPdfError,
@@ -29,27 +30,104 @@ function reviveError(shape: { name: string; message: string; code: string }): Er
   }
 }
 
+type Bridge = {
+  send: (msg: WorkerRequest) => void;
+  onMessage: (fn: (msg: WorkerResponse) => void) => void;
+  onError: (fn: (err: Error) => void) => void;
+  onExit: (fn: (code: number | null) => void) => void;
+  terminate: () => Promise<void>;
+};
+
+function forkEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  if (process.versions.electron) env.ELECTRON_RUN_AS_NODE = "1";
+  return env;
+}
+
+function startFork(script: string): Bridge {
+  const child: ChildProcess = fork(script, [], {
+    stdio: ["ignore", "ignore", "pipe", "ipc"],
+    env: forkEnv(),
+    execArgv: [],
+    serialization: "advanced",
+  });
+  return {
+    send: (msg) => {
+      child.send(msg);
+    },
+    onMessage: (fn) => {
+      child.on("message", fn);
+    },
+    onError: (fn) => {
+      child.on("error", fn);
+    },
+    onExit: (fn) => {
+      child.on("exit", (code) => {
+        fn(code);
+      });
+    },
+    terminate: async () => {
+      if (child.killed || child.exitCode !== null) return;
+      child.kill();
+      await new Promise<void>((resolve) => {
+        child.once("exit", () => resolve());
+        setTimeout(resolve, 1000);
+      });
+    },
+  };
+}
+
+function startWorker(script: string): Bridge {
+  const worker = new Worker(script);
+  return {
+    send: (msg) => {
+      worker.postMessage(msg);
+    },
+    onMessage: (fn) => {
+      worker.on("message", fn);
+    },
+    onError: (fn) => {
+      worker.on("error", fn);
+    },
+    onExit: (fn) => {
+      worker.on("exit", (code) => {
+        fn(code);
+      });
+    },
+    terminate: async () => {
+      await worker.terminate();
+    },
+  };
+}
+
+function useChildProcess(workerProcess: boolean | undefined): boolean {
+  if (workerProcess === true) return true;
+  if (workerProcess === false) return false;
+  return Boolean(process.versions.electron);
+}
+
 export async function createWorkerSession(
   filePath: string,
   options: SessionOptions = {},
 ): Promise<MuinSession> {
-  const script = resolveSessionWorker();
-  const worker = new Worker(script);
+  const { workerScript, workerProcess, ...openOptions } = options;
+  const script = workerScript ?? resolveSessionWorker();
+  const bridge = useChildProcess(workerProcess) ? startFork(script) : startWorker(script);
   let nextId = 1;
   const pending = new Map<number, { resolve: (r: WorkerResponse) => void; reject: (e: Error) => void }>();
   let snap: SessionSnapshot = { cwd: { objectNumber: 0, generation: 0 }, path: [], historyLength: 0 };
   let closed = false;
   let chain: Promise<void> = Promise.resolve();
 
-  worker.on("message", (msg: WorkerResponse) => {
+  bridge.onMessage((msg: WorkerResponse) => {
     pending.get(msg.id)?.resolve(msg);
     pending.delete(msg.id);
   });
-  worker.on("error", (err) => {
+  bridge.onError((err) => {
     for (const p of pending.values()) p.reject(err);
     pending.clear();
   });
-  worker.on("exit", (code) => {
+  bridge.onExit((code) => {
     if (closed) return;
     const err = new Error(`muin session worker exited (${code})`);
     for (const p of pending.values()) p.reject(err);
@@ -61,7 +139,7 @@ export async function createWorkerSession(
       new Promise<WorkerResponse>((resolve, reject) => {
         const id = nextId++;
         pending.set(id, { resolve, reject });
-        worker.postMessage({ ...req, id } satisfies WorkerRequest);
+        bridge.send({ ...req, id } satisfies WorkerRequest);
       });
     const job = chain.then(run, run);
     chain = job.then(
@@ -72,12 +150,12 @@ export async function createWorkerSession(
   };
 
   try {
-    const opened = await rpc({ type: "open", filePath, options });
+    const opened = await rpc({ type: "open", filePath, options: openOptions });
     if (!opened.ok) throw reviveError(opened.error);
     if (opened.snapshot) snap = opened.snapshot;
   } catch (err) {
     closed = true;
-    await worker.terminate();
+    await bridge.terminate();
     throw err;
   }
 
@@ -102,7 +180,7 @@ export async function createWorkerSession(
       void rpc({ type: "close" })
         .catch(() => undefined)
         .finally(() => {
-          void worker.terminate();
+          void bridge.terminate();
         });
     },
   };
