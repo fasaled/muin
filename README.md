@@ -1,5 +1,7 @@
 # Muin
 
+<img src="brand/logo.png" width="128" height="128" alt="Muin">
+
 A tool that represents the internal structure of a PDF file — indirect objects, streams, page tree, cross-references — as a navigable graph.
 
 Three clients share one command core. You install **either** the CLI **or** the VS Code extension; neither requires the other.

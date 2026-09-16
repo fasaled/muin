@@ -1,5 +1,7 @@
 # Muin
 
+<img src="https://raw.githubusercontent.com/fasaled/muin/main/brand/logo.png" width="128" height="128" alt="Muin">
+
 Explore a PDF’s internals from the terminal — indirect objects, streams, page tree, and cross-references — as a navigable graph.
 
 ```bash
