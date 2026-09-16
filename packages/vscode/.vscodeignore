@@ -4,6 +4,7 @@ tsconfig.json
 node_modules/**
 .vscode/**
 *.map
+media/**
 # dist/ and vendor/ are gitignored; keep them in the vsix
 !dist/**
 !vendor/**

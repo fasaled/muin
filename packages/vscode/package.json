@@ -10,12 +10,22 @@
     "type": "git",
     "url": "https://github.com/fasaled/muin.git"
   },
+  "bugs": {
+    "url": "https://github.com/fasaled/muin/issues"
+  },
+  "homepage": "https://github.com/fasaled/muin",
   "engines": {
     "vscode": "^1.101.0"
   },
   "categories": [
     "Visualization",
     "Other"
+  ],
+  "keywords": [
+    "pdf",
+    "graph",
+    "mcp",
+    "visualization"
   ],
   "activationEvents": [
     "onStartupFinished"
