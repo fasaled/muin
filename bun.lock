@@ -16,13 +16,13 @@
         "muin": "dist/cli.js",
       },
       "dependencies": {
-        "@muin/core": "workspace:*",
         "ink": "^7.1.1",
         "react": "^19.3.0",
         "react-devtools-core": "^8.0.0",
       },
       "devDependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
+        "@muin/core": "workspace:*",
         "@types/react": "^19.3.0",
         "ink-testing-library": "^4.0.0",
       },

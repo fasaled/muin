@@ -1,3 +1,4 @@
+export { VERSION } from "./version.ts";
 export { createSession, bindSession, type MuinSession, type SessionOptions, type SessionSnapshot, type CommandResult } from "./session.ts";
 export { parseCommand, type ParsedCommand } from "./commands/parse.ts";
 export { helpText } from "./commands/help.ts";

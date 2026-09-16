@@ -10,13 +10,12 @@ import {
   serveMcpStdio,
   UsageError,
   vendorPaths,
+  VERSION,
 } from "@muin/core";
 import { completionHelp, completionScript, normalizeCompletionShell } from "./completion.ts";
 import { startTui } from "./tui/start.ts";
 
-export { UsageError };
-
-export const VERSION = "0.0.0";
+export { UsageError, VERSION };
 
 const HELP = `muin — PDF internal structure explorer
 

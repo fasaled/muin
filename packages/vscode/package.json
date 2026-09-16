@@ -1,11 +1,15 @@
 {
   "name": "muin",
   "displayName": "Muin",
-  "description": "Explore a PDF’s internal object graph in VS Code. Same command core as the Muin CLI; Copilot gets MCP tools automatically.",
-  "version": "0.0.0",
+  "description": "Explore a PDF’s internals in the editor — objects, streams, page tree, and cross-references — as a navigable graph. Visual panel plus MCP tools for Copilot.",
+  "version": "0.1.0",
   "publisher": "fasaled",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fasaled/muin.git"
+  },
   "engines": {
     "vscode": "^1.101.0"
   },

@@ -28,7 +28,7 @@ bun run build
 bun packages/cli/src/cli.ts --help
 ```
 
-The published CLI still runs on Node (`#!/usr/bin/env node`). After `bun run build`, smoke-test with `node packages/cli/dist/cli.js --help`.
+The published CLI still runs on Node (`#!/usr/bin/env node`). After `bun run build`, smoke-test with `node packages/cli/dist/cli.js --help`. Before `npm publish`, pack and install the tarball in a clean directory (`npm pack` in `packages/cli`, then `npm install ./fasaled-muin-<version>.tgz` elsewhere) and run `npx muin fixtures/pdf/minimal.pdf check`.
 
 ## Language
 
@@ -83,4 +83,10 @@ Follow [docs/wasm.md](wasm.md) (Docker, pinned URLs, checksums). Bumping qpdf or
 
 ## Publishing
 
-Version stays `0.0.0` until TUI + MCP can open a real PDF. Then `0.1.0` via `npm publish --access public`. Making the GitHub repository public is a human account action.
+Package versions stay in lockstep (`packages/core`, `packages/cli`, `packages/vscode`, and `packages/core/src/version.ts`). Bump all four together, push to `main`, then create the GitHub Release locally (tag + notes; GitHub attaches source zip/tar.gz):
+
+```bash
+gh release create v0.1.0 --title "Muin 0.1.0" --generate-notes --target main
+```
+
+Do not attach npm tarballs or vsix files. npm publish of `@fasaled/muin` and Marketplace publish are separate (`npm publish --access public` from `packages/cli`, `vsce publish` from `packages/vscode`).

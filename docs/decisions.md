@@ -16,7 +16,7 @@ Each entry: context, decision, consequences.
 
 **Decision:** Bun is the toolchain (`bun install`, `bun test`, `bun run build`, pinned `packageManager`). The published `bin` shebang is `#!/usr/bin/env node`. Emitted JS targets Node ≥ 18 and also runs on Bun.
 
-**Consequences:** CI installs Bun for tests and also smoke-runs `dist/cli.js` with Node. We do not require Bun at runtime for the published package.
+**Consequences:** Local tests and builds use Bun. Smoke-run `dist/cli.js` with Node before publish. We do not require Bun at runtime for the published package.
 
 ## D3 — In-house qpdf WASM, no npm wrapper
 
@@ -110,9 +110,9 @@ Each entry: context, decision, consequences.
 
 **Context:** Hosted Actions consume the private-repo minute quota (WASM compile was especially expensive).
 
-**Decision:** No workflows under `.github/workflows`. Tests, typecheck, and builds run locally (`bun test`, `bun run build`). qpdf WASM is vendored and rebuilt with Docker on a developer machine.
+**Decision:** No workflows under `.github/workflows`. Tests, typecheck, and builds run locally (`bun test`, `bun run build`). qpdf WASM is vendored and rebuilt with Docker on a developer machine. Version tags and GitHub Releases are created locally with `gh release create` (notes + the source archives GitHub attaches automatically). Do not attach npm tarballs or vsix files to the GitHub Release.
 
-**Consequences:** Nothing runs on push. CI is optional and local.
+**Consequences:** Nothing runs on push. Cutting a release is `gh release create vX.Y.Z --generate-notes` after the version bump is on `main`.
 
 ## D15 — WASM `callMain` on a worker thread
 

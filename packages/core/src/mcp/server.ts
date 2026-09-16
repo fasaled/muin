@@ -8,6 +8,7 @@ import type { ParsedCommand } from "../commands/parse.ts";
 import { helpText } from "../commands/help.ts";
 import { UsageError } from "../errors.ts";
 import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
+import { VERSION } from "../version.ts";
 
 /** Env file the VS Code extension updates with the PDF in the active tab / Muin panel. */
 export const MUIN_FOCUSED_PDF_FILE = "MUIN_FOCUSED_PDF_FILE";
@@ -54,7 +55,7 @@ export type McpServerOptions = {
 export function createMcpServer(options: McpServerOptions = {}): McpServer {
   const opener = options.openSession ?? createSession;
   let session: MuinSession | undefined = options.session;
-  const server = new McpServer({ name: "muin", version: "0.0.0" });
+  const server = new McpServer({ name: "muin", version: VERSION });
 
   const requireSession = (): MuinSession => {
     if (!session) {
