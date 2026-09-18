@@ -28,10 +28,10 @@ The unscoped name `muin` is blocked by npm’s similarity filter. The package is
 
 `muin document.pdf` opens a full-screen explorer: the current object’s neighborhood (incoming / current / outgoing refs), the object itself, and a command box. Those panes redraw in place on `cd` / `back` and never scroll.
 
-- `Tab` with an empty command box switches focus between the graph and the prompt.
+- `Tab` completes and cycles command, flag, and reference candidates. `Shift+Tab` changes focus between the prompt, graph, and object.
 - With the graph focused, `←`/`→` pick a pane, `↑`/`↓` pick a neighbor, `Enter` is `cd <ref>`.
 - Any other command (`find`, `tree`, `check`, `help`, `history`, `cat`, `stream`, …) opens a dismissible overlay. If it is taller than the screen, `↑`/`↓`/`PageUp`/`PageDown` scroll it; `Esc` closes it.
-- `Tab` in the command box opens completion (commands, flags, neighborhood refs).
+- The command panel shows the initial command list, file, cwd, active operation, and queue. History is persistent in `~/.config/muin/history.json`; commands submitted while busy are queued and run in order.
 
 If stdin is not a TTY, Muin uses a line-oriented REPL instead of the TUI.
 
@@ -62,7 +62,7 @@ muin completion fish > ~/.config/fish/completions/muin.fish
 muin completion powershell | Out-String | Invoke-Expression
 ```
 
-Completes flags, `*.pdf` files, and one-shot command names. It does not open the PDF to complete object refs.
+Completes flags, `*.pdf` files, and one-shot command names. The interactive TUI also completes multi-token object references from the current neighborhood without opening another PDF.
 
 ## Commands
 
