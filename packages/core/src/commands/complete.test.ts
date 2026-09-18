@@ -26,6 +26,12 @@ describe("complete", () => {
     expect(complete("cd 3", 4, ctx)).toEqual({ items: ["3 0 R"], replaceFrom: 3 });
     expect(complete("refs ", 5, ctx).items).toEqual(["3 0 R", "4 0 R"]);
   });
+  
+    test("completes a multi-token reference from its full prefix", () => {
+      const result = complete("cd 3 0", 6, ctx);
+      expect(result.items).toEqual(["3 0 R"]);
+      expect(result.replaceFrom).toBe(3);
+    });
 
   test("no completions for a command that doesn't take a ref", () => {
     expect(complete("check ", 6, ctx).items).toEqual([]);

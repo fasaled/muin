@@ -2,7 +2,7 @@
   "name": "muin",
   "displayName": "Muin",
   "description": "Explore a PDF’s internals in the editor — objects, streams, page tree, and cross-references — as a navigable graph. Visual panel plus MCP tools for Copilot.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "fasaled",
   "license": "MIT",
   "private": true,

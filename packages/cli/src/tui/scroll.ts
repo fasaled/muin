@@ -39,6 +39,8 @@ export function wrapToWidth(text: string, width: number): string[] {
 export function useScrollableText(
   text: string,
   active: boolean,
+  startAtEnd = false,
+  scrollRequest?: { id: number; direction: "up" | "down" | "pageUp" | "pageDown" },
 ): {
   ref: React.RefObject<DOMElement | null>;
   visible: string[];
@@ -50,13 +52,23 @@ export function useScrollableText(
   const [scroll, setScroll] = useState(0);
 
   useEffect(() => {
-    setScroll(0);
-  }, [text]);
+    setScroll(startAtEnd ? Number.MAX_SAFE_INTEGER : 0);
+  }, [startAtEnd, text]);
 
   const lines = useMemo(() => wrapToWidth(text, Math.max(1, width)), [text, width]);
   const maxScroll = Math.max(0, lines.length - height);
   const clamped = Math.min(scroll, maxScroll);
   const visible = lines.slice(clamped, clamped + height);
+
+  useEffect(() => {
+    if (!scrollRequest) return;
+    setScroll((current) => {
+      if (scrollRequest.direction === "up") return Math.max(0, current - 1);
+      if (scrollRequest.direction === "down") return Math.min(maxScroll, current + 1);
+      if (scrollRequest.direction === "pageUp") return Math.max(0, current - height);
+      return Math.min(maxScroll, current + height);
+    });
+  }, [height, maxScroll, scrollRequest]);
 
   useInput(
     (_input, key) => {

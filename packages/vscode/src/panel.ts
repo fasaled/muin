@@ -49,9 +49,15 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
   const pending: WebviewInbound[] = [];
   let disposed = false;
   let chain = Promise.resolve();
+  let history = context.globalState.get<string[]>(`muin.history.${pdfPath}`, [])?.slice(-200) ?? [];
+  let pendingOperations = 0;
 
   const enqueue = (fn: () => Promise<void>) => {
     chain = chain.then(fn, fn);
+  };
+
+  const postOperation = async (phase: "queued" | "running" | "idle", line?: string) => {
+    if (!disposed) await panel.webview.postMessage({ type: "operation", phase, line, pending: pendingOperations });
   };
 
   const handle = async (msg: WebviewInbound) => {
@@ -60,17 +66,41 @@ export async function openExplorer(context: vscode.ExtensionContext, pdfPath: st
       return;
     }
     try {
-      const out = await handleWebviewMessage(session, msg);
+      const out = await handleWebviewMessage(session, msg, {
+        history,
+        onHistory: (next) => {
+          history = next;
+          void context.globalState.update(`muin.history.${pdfPath}`, history);
+        },
+      });
       if (!disposed) await panel.webview.postMessage(out);
     } catch (err) {
       if (!disposed) {
-        await panel.webview.postMessage({ type: "log", log: `error: ${formatProcessError(err)}` });
+        await panel.webview.postMessage({
+          type: "overlay",
+          title: msg.line ?? "operation",
+          body: `error: ${formatProcessError(err)}`,
+        });
       }
     }
   };
 
   panel.webview.onDidReceiveMessage((msg: WebviewInbound) => {
-    enqueue(() => handle(msg));
+    const operation = msg.type === "run" || msg.type === "cd";
+    if (operation) {
+      pendingOperations += 1;
+      void postOperation("queued", msg.line ?? (msg.ref ? `cd ${msg.ref}` : undefined));
+    }
+    enqueue(async () => {
+      if (operation) await postOperation("running", msg.line ?? (msg.ref ? `cd ${msg.ref}` : undefined));
+      await handle(msg);
+    });
+    if (operation) {
+      enqueue(async () => {
+        pendingOperations = Math.max(0, pendingOperations - 1);
+        await postOperation("idle");
+      });
+    }
   });
 
   panel.onDidDispose(() => {

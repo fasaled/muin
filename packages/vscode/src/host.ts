@@ -12,7 +12,7 @@ import {
 // The overlay's #overlayBody scrolls (CSS overflow: auto), so this is a memory sanity cap, not a screen-space one.
 export const UI_TEXT_MAX_CHARS = TEXT_PREVIEW_MAX_CHARS;
 
-export type WebviewInbound = { type?: string; line?: string; ref?: string; cursor?: number };
+export type WebviewInbound = { type?: string; line?: string; ref?: string; cursor?: number; all?: boolean };
 
 export type HostState = {
   type: "state";
@@ -23,17 +23,19 @@ export type HostState = {
   canBack: boolean;
   neighbors: Neighbors;
   ls: string;
+  history: string[];
 };
 
 /** A one-line status/error, shown next to the input and replaced by the next outcome — never appended. */
 export type HostLog = { type: "log"; log: string };
 
 /** Result of any command other than cd/back: shown in a dismissible panel over the graph, not a growing log. */
-export type HostOverlay = { type: "overlay"; title: string; body: string };
+export type HostOverlay = { type: "overlay"; title: string; body: string; history?: string[] };
 
 export type HostCompletions = { type: "completions"; items: string[]; replaceFrom: number };
+export type HostOperation = { type: "operation"; phase: "queued" | "running" | "idle"; line?: string; pending: number };
 
-export type HostOutbound = HostState | HostLog | HostOverlay | HostCompletions;
+export type HostOutbound = HostState | HostLog | HostOverlay | HostCompletions | HostOperation;
 
 export function truncateOutput(text: string, max = UI_TEXT_MAX_CHARS): string {
   if (text.length <= max) return text;
@@ -76,7 +78,7 @@ function neighborRefsOf(nb: Neighbors): string[] {
   return [...nb.incoming.entries, ...nb.outgoing.entries].map((e) => e.ref);
 }
 
-export async function snapshotState(session: MuinSession): Promise<HostState> {
+export async function snapshotState(session: MuinSession, history: string[] = []): Promise<HostState> {
   const nbRes = await session.run("neighbors");
   await yieldToEventLoop();
   const ls = await session.run("ls");
@@ -93,21 +95,37 @@ export async function snapshotState(session: MuinSession): Promise<HostState> {
     canBack: snap.historyLength > 0,
     neighbors,
     ls: ls.kind === "text" ? truncateOutput(ls.text, 4_000) : "",
+    history,
   };
 }
 
-export async function handleWebviewMessage(session: MuinSession, msg: WebviewInbound): Promise<HostOutbound> {
+export async function handleWebviewMessage(
+  session: MuinSession,
+  msg: WebviewInbound,
+  options: { history?: string[]; onHistory?: (history: string[]) => void } = {},
+): Promise<HostOutbound> {
+  const history = options.history ?? [];
   if (msg.type === "ready") {
-    return snapshotState(session);
+    return snapshotState(session, history);
   }
   if (msg.type === "cd" && msg.ref) {
     await session.run(`cd ${msg.ref}`);
-    return snapshotState(session);
+    return snapshotState(session, history);
   }
   if (msg.type === "run" && msg.line) {
+    const nextHistory = [...history, msg.line].slice(-200);
+    options.onHistory?.(nextHistory);
+    if (msg.line.trim() === "history") {
+      return {
+        type: "overlay",
+        title: "history",
+        body: nextHistory.length === 0 ? "(empty)" : nextHistory.map((line, i) => `${i + 1}  ${line}`).join("\n"),
+        history: nextHistory,
+      };
+    }
     if (isNavigationCommand(msg.line)) {
       await session.run(msg.line);
-      return snapshotState(session);
+      return snapshotState(session, nextHistory);
     }
     const result = await session.run(msg.line);
     return { type: "overlay", title: msg.line, body: formatPanelResult(result) };
@@ -119,6 +137,7 @@ export async function handleWebviewMessage(session: MuinSession, msg: WebviewInb
     const result = complete(msg.line, msg.cursor, {
       neighborRefs: neighborRefsOf(neighborsOf(nbRes, cwd)),
       extraCommands: ["history"],
+      ...(msg.all ? { maxItems: 100 } : {}),
     });
     return { type: "completions", items: result.items, replaceFrom: result.replaceFrom };
   }
