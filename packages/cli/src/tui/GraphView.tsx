@@ -26,34 +26,37 @@ function KindSpan({ kind, emphasize }: { kind: string; emphasize?: boolean }) {
   return <Text dimColor>{bracketKind(kind)}</Text>;
 }
 
-function EntryLine({ entry, selected }: { entry: NeighborEntry; selected: boolean }) {
-  const marker = selected ? "▸ " : "  ";
+function EntryLine({ entry, selected, direction }: { entry: NeighborEntry; selected: boolean; direction: "in" | "out" }) {
+  const marker = selected ? (direction === "in" ? "◀ " : "▶ ") : "  ";
+  const selectedColor = direction === "in" ? "yellow" : "cyan";
   if (entry.missing) {
-    return (
-      <Text inverse={selected} dimColor>
-        {marker}
-        {entry.ref}  {bracketKind("missing")}
-      </Text>
+    return selected ? (
+      <Text color={selectedColor} bold>{marker}{entry.ref}  {bracketKind("missing")}</Text>
+    ) : (
+      <Text dimColor>{marker}{entry.ref}  {bracketKind("missing")}</Text>
     );
   }
-  return (
-    <Text inverse={selected}>
+  const content = (
+    <>
       {marker}
       {entry.ref}
       {entry.kind ? "  " : ""}
       {entry.kind ? <KindSpan kind={entry.kind} /> : null}
-    </Text>
+    </>
   );
+  return selected ? <Text color={selectedColor} bold>{content}</Text> : <Text>{content}</Text>;
 }
 
 function NeighborColumn({
   title,
   entries,
   selectedIndex,
+  direction,
 }: {
   title: string;
   entries: NeighborEntry[];
   selectedIndex: number | undefined;
+  direction: "in" | "out";
 }) {
   const { ref, height } = useViewportSize();
   const viewportHeight = Math.max(1, height);
@@ -62,7 +65,7 @@ function NeighborColumn({
 
   return (
     <Box flexDirection="column" width={30}>
-      <Text dimColor underline>
+      <Text color={direction === "in" ? "yellow" : "cyan"} bold>
         {title}
       </Text>
       {entries.length === 0 ? (
@@ -70,7 +73,12 @@ function NeighborColumn({
       ) : (
         <Box ref={ref} flexDirection="column" flexGrow={1} overflow="hidden">
           {visible.map((entry, i) => (
-            <EntryLine key={entry.ref} entry={entry} selected={offset + i === selectedIndex} />
+            <EntryLine
+              key={entry.ref}
+              entry={entry}
+              direction={direction}
+              selected={offset + i === selectedIndex}
+            />
           ))}
         </Box>
       )}
@@ -139,21 +147,25 @@ export function GraphView({ neighbors, focused, busy, onNavigate }: Props) {
             title={`← incoming (${neighbors.incoming.total})`}
             entries={neighbors.incoming.entries}
             selectedIndex={column === "incoming" ? index : undefined}
+            direction="in"
           />
-          <Box flexGrow={1} flexDirection="column" alignItems="center" paddingX={1}>
-            <Text dimColor>current</Text>
-            <Text>
+          <Box flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center" paddingX={2}>
+            <Box borderStyle="round" borderColor="green" paddingX={2} paddingY={1} flexDirection="column" alignItems="center">
+              <Text dimColor>current node</Text>
+              <Text>
               <Text color="green" bold>
                 {neighbors.current.ref}
               </Text>
               {neighbors.current.kind ? "  " : ""}
               {neighbors.current.kind ? <KindSpan kind={neighbors.current.kind} emphasize /> : null}
-            </Text>
+              </Text>
+            </Box>
           </Box>
           <NeighborColumn
             title={`outgoing (${neighbors.outgoing.total}) →`}
             entries={neighbors.outgoing.entries}
             selectedIndex={column === "outgoing" ? index : undefined}
+            direction="out"
           />
         </Box>
       )}

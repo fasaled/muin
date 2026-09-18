@@ -1,10 +1,30 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createElement } from "react";
 import { render } from "ink-testing-library";
 import { bindSession } from "@muin/core";
 import { openSession } from "../../../core/src/graph/session.ts";
 import { fakeAdapter, loadMinimalStructure, minimalSession } from "../../../core/src/test/helpers.ts";
 import { App, renderResult } from "./App.tsx";
+
+const originalConfigHome = process.env.XDG_CONFIG_HOME;
+const testConfigHome = mkdtempSync(join(tmpdir(), "muin-tui-test-"));
+
+beforeAll(() => {
+  process.env.XDG_CONFIG_HOME = testConfigHome;
+});
+
+beforeEach(() => {
+  rmSync(join(testConfigHome, "muin", "history.json"), { force: true });
+});
+
+afterAll(() => {
+  if (originalConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+  else process.env.XDG_CONFIG_HOME = originalConfigHome;
+  rmSync(testConfigHome, { recursive: true, force: true });
+});
 
 describe("renderResult", () => {
   test("text and json", () => {
@@ -42,14 +62,36 @@ describe("App", () => {
     instance.unmount();
   });
 
-  test("Tab toggles focus between prompt and graph", async () => {
+  test("Tab completes while empty and Shift+Tab focuses the graph", async () => {
     const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
     const instance = render(createElement(App, { session }));
     await Bun.sleep(50);
-    expect(instance.lastFrame() ?? "").toContain("Tab complete/graph");
+    expect(instance.lastFrame() ?? "").toContain("Enter run   Tab complete   Up/Down history");
+    instance.stdin.write("\u001b[Z");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("Shift+Tab → object");
+    instance.unmount();
+  });
+
+  test("Tab cycles the full initial command list", async () => {
+    const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
+    const instance = render(createElement(App, { session }));
+    await Bun.sleep(50);
     instance.stdin.write("\t");
     await Bun.sleep(10);
-    expect(instance.lastFrame() ?? "").toContain("Tab → object");
+    expect(instance.lastFrame() ?? "").toContain("› ls ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("› cd ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("› pwd ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("› back ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("› refs ");
     instance.unmount();
   });
 
@@ -57,7 +99,7 @@ describe("App", () => {
     const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
     const instance = render(createElement(App, { session }));
     await Bun.sleep(50);
-    instance.stdin.write("\t");
+    instance.stdin.write("\u001b[Z");
     await Bun.sleep(10);
     instance.stdin.write("\r");
     await Bun.sleep(50);
@@ -127,6 +169,26 @@ describe("App", () => {
     instance.unmount();
   });
 
+  test("Tab cycles through every matching command candidate", async () => {
+    const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
+    const instance = render(createElement(App, { session }));
+    await Bun.sleep(50);
+    instance.stdin.write("c");
+    await Bun.sleep(10);
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("cd");
+    expect(instance.lastFrame() ?? "").toContain("› cd ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("cat");
+    expect(instance.lastFrame() ?? "").toContain("› cat ");
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("check");
+    instance.unmount();
+  });
+
   test("completing a ref argument fills the draft without submitting", async () => {
     const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
     const instance = render(createElement(App, { session }));
@@ -139,6 +201,19 @@ describe("App", () => {
     await Bun.sleep(10);
     const frame = instance.lastFrame() ?? "";
     expect(frame).toContain("› cd 3 0 R");
+    expect(session.snapshot().cwd).toEqual({ objectNumber: 1, generation: 0 });
+    instance.unmount();
+  });
+
+  test("completes a reference from its typed prefix", async () => {
+    const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
+    const instance = render(createElement(App, { session }));
+    await Bun.sleep(50);
+    instance.stdin.write("cd 3");
+    await Bun.sleep(10);
+    instance.stdin.write("\t");
+    await Bun.sleep(10);
+    expect(instance.lastFrame() ?? "").toContain("› cd 3 0 R");
     expect(session.snapshot().cwd).toEqual({ objectNumber: 1, generation: 0 });
     instance.unmount();
   });
@@ -197,11 +272,11 @@ describe("App", () => {
     await Bun.sleep(30);
 
     const before = instance.lastFrame() ?? "";
-    expect(before).toContain("1  pwd");
+    expect(before).toContain("25  pwd");
     expect(before).toMatch(/\/\d+/); // a "N/total" position indicator is shown
-    expect(before).not.toContain("25  pwd"); // the last entry doesn't fit yet
+    expect(before).toContain("activity"); // command history is rendered inside the activity panel
 
-    instance.stdin.write("[B"); // down arrow
+    instance.stdin.write("[A"); // up arrow
     await Bun.sleep(10);
     const after = instance.lastFrame() ?? "";
     expect(after).not.toEqual(before); // scrolling actually changed the visible window
@@ -209,23 +284,23 @@ describe("App", () => {
     instance.unmount();
   });
 
-  test("Tab cycles prompt -> graph -> object -> prompt", async () => {
+  test("Shift+Tab cycles prompt -> graph -> object -> prompt", async () => {
     const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
     const instance = render(createElement(App, { session }));
     await Bun.sleep(50);
-    expect(instance.lastFrame() ?? "").toContain("Tab complete/graph");
+    expect(instance.lastFrame() ?? "").toContain("Enter run   Tab complete   Up/Down history");
 
-    instance.stdin.write("\t");
+    instance.stdin.write("\u001b[Z");
     await Bun.sleep(10);
     expect(instance.lastFrame() ?? "").toContain("Tab → object");
 
-    instance.stdin.write("\t");
+    instance.stdin.write("\u001b[Z");
     await Bun.sleep(10);
-    expect(instance.lastFrame() ?? "").toContain("Tab/Esc → prompt");
+    expect(instance.lastFrame() ?? "").toContain("Shift+Tab → prompt");
 
-    instance.stdin.write("\t");
+    instance.stdin.write("\u001b[Z");
     await Bun.sleep(10);
-    expect(instance.lastFrame() ?? "").toContain("Tab complete/graph");
+    expect(instance.lastFrame() ?? "").toContain("Enter run   Tab complete   Up/Down history");
 
     instance.unmount();
   });
@@ -247,9 +322,9 @@ describe("App", () => {
     expect(before).toMatch(/\/\d+/); // position indicator, e.g. "1-5/40"
     expect(before).not.toContain("/Key39"); // doesn't fit yet
 
-    instance.stdin.write("\t"); // focus graph
+    instance.stdin.write("\u001b[Z"); // focus graph
     await Bun.sleep(10);
-    instance.stdin.write("\t"); // focus object
+    instance.stdin.write("\u001b[Z"); // focus object
     await Bun.sleep(10);
     instance.stdin.write("[B"); // down arrow: scroll
     await Bun.sleep(10);

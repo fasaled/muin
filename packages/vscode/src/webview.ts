@@ -41,7 +41,7 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
     html, body { margin: 0; height: 100%; background: var(--muin-bg); color: var(--muin-fg); font: 13px/1.45 var(--muin-mono); }
     button, input { font: inherit; color: inherit; }
-    #app { display: grid; grid-template-rows: auto 1fr auto auto auto; height: 100%; min-height: 0; }
+    #app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; min-height: 0; }
     header { padding: 8px 12px 6px; }
     header .brand { color: var(--muin-cyan); font-weight: 700; }
     header .file { color: var(--muin-dim); }
@@ -55,13 +55,13 @@ export function webviewHtml(assets: WebviewAssets): string {
     header .rule { height: 1px; background: var(--muin-border); margin-top: 6px; }
     .spacer { flex: 1; }
     #content { position: relative; min-height: 0; }
-    #main, #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; gap: 8px; padding: 0 10px 6px; }
+    #main, #overlay { position: absolute; inset: 0 16px 8px; display: flex; flex-direction: column; min-height: 0; gap: 10px; padding: 0; }
     #main.hide { display: none; }
-    #overlay { display: none; }
+    #overlay { display: none; margin: 0; width: auto; }
     #overlay.show { display: flex; }
     .box {
       border: 1px solid var(--muin-border);
-      border-radius: 8px;
+      border-radius: 12px;
       min-height: 0;
       padding: 6px 10px;
     }
@@ -74,12 +74,16 @@ export function webviewHtml(assets: WebviewAssets): string {
       cursor: default;
     }
     #graph.focused { border-color: var(--muin-focus); }
-    #neighborhood { display: flex; flex: 1; min-height: 0; gap: 8px; }
+    #neighborhood { display: flex; flex: 1; min-height: 0; gap: 0; }
     .col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-    .col.side { flex: 1; }
-    .col.current { flex: 1.1; align-items: center; justify-content: center; text-align: center; padding: 8px; }
+    .col.side { flex: 1; padding: 0 8px; }
+    .col.current { flex: 1.2; align-items: center; justify-content: center; text-align: center; padding: 8px 14px; }
     .col-title { color: var(--muin-dim); font-size: 11px; text-transform: lowercase; letter-spacing: 0.02em; border-bottom: 1px solid var(--muin-border); padding-bottom: 3px; margin-bottom: 4px; }
+    .col.side:first-child .col-title { color: var(--muin-yellow); }
+    .col.side:last-child .col-title { color: var(--muin-cyan); }
     .col.current .col-title { border: none; }
+    #currentNode { border: 1px solid var(--muin-green); border-radius: 10px; padding: 12px 16px; min-width: 110px; }
+    #currentNode .col-title { margin: 0 0 5px; }
     .list { flex: 1; overflow: auto; }
     .entry {
       display: flex; gap: 8px; align-items: baseline;
@@ -87,9 +91,11 @@ export function webviewHtml(assets: WebviewAssets): string {
       white-space: nowrap;
     }
     .entry:hover { background: var(--vscode-list-hoverBackground, rgba(255,255,255,0.06)); }
-    .entry.selected { background: var(--vscode-list-activeSelectionBackground, #094771); color: var(--vscode-list-activeSelectionForeground, #fff); }
+    .entry.selected { background: color-mix(in srgb, var(--muin-focus) 12%, transparent); color: var(--muin-fg); border: 1px solid color-mix(in srgb, var(--muin-focus) 55%, transparent); border-radius: 8px; }
     .entry.missing { opacity: 0.55; cursor: default; }
     .entry .marker { width: 1.2em; flex: none; color: var(--muin-dim); }
+    .col.side:first-child .entry.selected .marker { color: var(--muin-yellow); }
+    .col.side:last-child .entry.selected .marker { color: var(--muin-cyan); }
     .entry.selected .marker { color: inherit; }
     .kind-real { }
     .kind-sum { color: var(--muin-dim); }
@@ -121,14 +127,21 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
     #overlayClose:hover { color: var(--vscode-errorForeground); }
     #overlayBody { flex: 1; overflow: auto; margin: 0; padding-top: 6px; white-space: pre-wrap; word-break: break-word; font: inherit; }
-    #hint { padding: 0 14px; color: var(--muin-dim); font-size: 12px; min-height: 1.3em; }
-    #status { min-height: 1.2em; padding: 0 14px; font-size: 12px; color: var(--vscode-errorForeground); }
+    #hint { height: 16px; padding-left: 24px; color: var(--muin-dim); font-size: 11px; line-height: 16px; overflow: hidden; }
+    #status { height: 16px; padding-left: 24px; font-size: 12px; line-height: 16px; color: var(--vscode-errorForeground); overflow: hidden; }
+    #operation { height: 16px; padding-left: 0; font-size: 12px; line-height: 16px; color: var(--muin-yellow); overflow: hidden; }
     #cmd {
-      display: flex; align-items: stretch; gap: 0; margin: 0 10px 10px;
-      border: 1px solid var(--muin-border); border-radius: 8px; padding: 4px 10px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 0; width: auto; height: auto; min-height: 0; box-sizing: border-box; overflow: hidden; margin: 10px 16px 16px;
+      border: 1px solid var(--muin-border); border-radius: 12px; padding: 4px 10px;
       background: var(--vscode-input-background, transparent);
     }
     #cmd.focused { border-color: var(--muin-focus); }
+    #cmd-header { display: flex; justify-content: space-between; align-items: baseline; height: 16px; }
+    #cmd-header .label { color: var(--muin-cyan); font-weight: 700; flex: 0 0 7ch; min-width: 7ch; white-space: nowrap; overflow: visible; }
+    #cmd-header #hint { flex: 1; padding-left: 8px; text-align: right; }
+    #cmd-context { height: 32px; color: var(--muin-dim); font-size: 11px; line-height: 16px; overflow: hidden; }
+    #cmd-queue { height: 16px; color: var(--muin-yellow); font-size: 12px; line-height: 16px; overflow: hidden; }
+    .cmd-row { display: flex; align-items: stretch; min-width: 0; }
     #promptMark { color: var(--muin-green); padding: 6px 8px 6px 0; user-select: none; }
     #promptMark.busy { color: var(--muin-yellow); }
     #promptMark.idle { color: var(--muin-dim); }
@@ -137,17 +150,11 @@ export function webviewHtml(assets: WebviewAssets): string {
       width: 100%; box-sizing: border-box; padding: 6px 0; border: none;
       background: transparent; color: var(--vscode-input-foreground, inherit); outline: none;
     }
-    #suggestions {
-      display: none; position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 4px;
-      background: var(--vscode-dropdown-background, var(--muin-bg));
-      border: 1px solid var(--vscode-dropdown-border, var(--muin-border));
-      max-height: 180px; overflow: auto; z-index: 10; border-radius: 6px;
-    }
-    #suggestions.show { display: block; }
-    #suggestions .item { padding: 3px 8px; cursor: pointer; }
-    #suggestions .item.active, #suggestions .item:hover {
-      background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground);
-    }
+    #suggestions { display: flex; visibility: hidden; flex: 0 0 22px; align-items: center; min-width: 0; padding: 0; color: var(--muin-cyan); font-size: 12px; font-weight: 600; white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    #suggestions::-webkit-scrollbar { display: none; }
+    #suggestions.show { visibility: visible; }
+    #suggestions strong { color: var(--muin-cyan); font-weight: 500; opacity: 0.72; }
+    #suggestions strong[data-active="true"] { font-weight: 800; opacity: 1; }
   </style>
 </head>
 <body>
@@ -170,9 +177,11 @@ export function webviewHtml(assets: WebviewAssets): string {
               <div class="list" id="incoming"></div>
             </div>
             <div class="col current">
-              <div class="col-title">current</div>
-              <div id="currentRef"></div>
-              <div id="currentKind"></div>
+              <div id="currentNode">
+                <div class="col-title">current node</div>
+                <div id="currentRef"></div>
+                <div id="currentKind"></div>
+              </div>
             </div>
             <div class="col side">
               <div class="col-title" id="outTitle">outgoing →</div>
@@ -195,14 +204,22 @@ export function webviewHtml(assets: WebviewAssets): string {
       </div>
       <div id="busy">…</div>
     </div>
-    <div id="hint"></div>
-    <div id="status" aria-live="polite"></div>
     <form id="cmd">
-      <span id="promptMark">›</span>
-      <div class="field">
-        <div id="suggestions" role="listbox"></div>
-        <input id="line" placeholder="ls  ·  cd /Pages  ·  find --type Page  ·  help  ·  history" autocomplete="off" spellcheck="false" />
+      <div id="cmd-header">
+        <span class="label">COMMAND</span>
+        <div id="hint"></div>
       </div>
+      <div id="suggestions" role="status"></div>
+      <div id="cmd-context"><div id="cmd-file"></div><div id="cmd-location"></div></div>
+      <div id="operation" aria-live="polite">active: idle</div>
+      <div id="cmd-queue">queue: empty</div>
+      <div class="cmd-row">
+        <span id="promptMark">›</span>
+        <div class="field">
+          <input id="line" placeholder="" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+      <div id="status" aria-live="polite"></div>
     </form>
   </div>
   <script nonce="${nonce}">
@@ -212,6 +229,10 @@ export function webviewHtml(assets: WebviewAssets): string {
     const overlayTitleEl = document.getElementById("overlayTitle");
     const overlayBodyEl = document.getElementById("overlayBody");
     const statusEl = document.getElementById("status");
+    const operationEl = document.getElementById("operation");
+    const commandQueueEl = document.getElementById("cmd-queue");
+    const commandFileEl = document.getElementById("cmd-file");
+    const commandLocationEl = document.getElementById("cmd-location");
     const hintEl = document.getElementById("hint");
     const input = document.getElementById("line");
     const cmdEl = document.getElementById("cmd");
@@ -226,14 +247,18 @@ export function webviewHtml(assets: WebviewAssets): string {
     let busy = false;
     let canBack = false;
     let focus = "prompt";
-    const history = [];
+    let history = [];
     let histPos = -1;
     let suggestItems = [];
     let suggestIndex = 0;
     let suggestReplaceFrom = 0;
+    let completeOnResponse = false;
+    let completionBaseValue = "";
+    let completionBaseCursor = 0;
     let neighbors = null;
     let column = "outgoing";
     let index = 0;
+    const activityEntries = [];
 
     function closeSuggestions() {
       suggestItems = [];
@@ -242,18 +267,18 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
 
     function renderSuggestions() {
-      suggestEl.innerHTML = "";
+      suggestEl.replaceChildren();
       suggestEl.classList.toggle("show", suggestItems.length > 0);
-      suggestItems.forEach((item, i) => {
-        const row = document.createElement("div");
-        row.className = "item" + (i === suggestIndex ? " active" : "");
-        row.textContent = (i === suggestIndex ? "▸ " : "  ") + item;
-        row.setAttribute("role", "option");
-        row.addEventListener("mousedown", (e) => {
-          e.preventDefault();
-          acceptSuggestion(i);
-        });
-        suggestEl.appendChild(row);
+      suggestEl.setAttribute("aria-label", "Completion hint");
+      suggestItems.forEach((item, itemIndex) => {
+        if (itemIndex > 0) suggestEl.appendChild(document.createTextNode("  ·  "));
+        const itemEl = document.createElement("strong");
+        itemEl.textContent = item;
+        if (itemIndex === suggestIndex) itemEl.dataset.active = "true";
+        suggestEl.appendChild(itemEl);
+      });
+      requestAnimationFrame(() => {
+        suggestEl.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest", inline: "center" });
       });
     }
 
@@ -261,23 +286,26 @@ export function webviewHtml(assets: WebviewAssets): string {
       suggestItems = items || [];
       suggestReplaceFrom = replaceFrom;
       suggestIndex = 0;
+      completionBaseValue = input.value;
+      completionBaseCursor = input.selectionStart || input.value.length;
       renderSuggestions();
     }
 
-    function acceptSuggestion(i) {
+    function acceptSuggestion(i, keepOpen = false) {
       const chosen = suggestItems[i];
       if (chosen === undefined) return;
-      const value = input.value;
-      const tail = value.slice(input.selectionStart || value.length);
+      const value = keepOpen ? completionBaseValue : input.value;
+      const cursor = keepOpen ? completionBaseCursor : (input.selectionStart || value.length);
+      const tail = value.slice(cursor);
       input.value = value.slice(0, suggestReplaceFrom) + chosen + " " + tail;
       const newCursor = suggestReplaceFrom + chosen.length + 1;
       input.setSelectionRange(newCursor, newCursor);
-      closeSuggestions();
+      if (!keepOpen) closeSuggestions();
       setFocus("prompt");
     }
 
-    function requestCompletion() {
-      vscode.postMessage({ type: "complete", line: input.value, cursor: input.selectionStart || input.value.length });
+    function requestCompletion(all = false) {
+      vscode.postMessage({ type: "complete", line: input.value, cursor: input.selectionStart || input.value.length, all });
     }
 
     function setBusy(on) {
@@ -290,6 +318,26 @@ export function webviewHtml(assets: WebviewAssets): string {
 
     function setStatus(text) {
       statusEl.textContent = text || "";
+    }
+
+    function setOperation(msg) {
+      if (msg.phase === "queued") {
+        operationEl.textContent = "active: " + (busy ? "running" : "idle");
+        commandQueueEl.textContent = "queue: " + (msg.pending || 1) + " queued";
+        return;
+      }
+      if (msg.phase === "running") {
+        operationEl.textContent = "active: running";
+        commandQueueEl.textContent = "queue: " + (msg.pending > 0 ? msg.pending + " queued" : "empty");
+        return;
+      }
+      operationEl.textContent = "active: idle";
+      commandQueueEl.textContent = "queue: " + (msg.pending > 0 ? msg.pending + " queued" : "empty");
+    }
+
+    function setCommandContext(msg) {
+      commandFileEl.textContent = "file: " + (msg.fileName || "PDF");
+      commandLocationEl.textContent = "cwd: " + (msg.location || msg.cwd || "");
     }
 
     function overlayOpen() {
@@ -309,7 +357,7 @@ export function webviewHtml(assets: WebviewAssets): string {
         hintEl.textContent = "click a ref to cd   ↑↓ scroll   Tab/Esc → prompt";
         return;
       }
-      hintEl.textContent = "help · history · back   ↑ history   Tab complete / graph   Esc overlay";
+      hintEl.textContent = "Enter run   Tab complete   Up/Down history";
     }
 
     function setFocus(next) {
@@ -326,8 +374,10 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
 
     function openOverlay(title, body) {
-      overlayTitleEl.textContent = title;
-      overlayBodyEl.textContent = body;
+      activityEntries.push("$ " + title + "\\n" + body);
+      if (activityEntries.length > 100) activityEntries.shift();
+      overlayTitleEl.textContent = "activity";
+      overlayBodyEl.textContent = activityEntries.join("\\n\\n");
       overlayEl.classList.add("show");
       mainEl.classList.add("hide");
       updateHint();
@@ -364,7 +414,7 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
 
     function cdTo(ref, missing) {
-      if (busy || !ref || missing) return;
+      if (!ref || missing) return;
       setBusy(true);
       vscode.postMessage({ type: "cd", ref: ref });
     }
@@ -385,7 +435,7 @@ export function webviewHtml(assets: WebviewAssets): string {
         row.dataset.ref = entry.ref;
         const marker = document.createElement("span");
         marker.className = "marker";
-        marker.textContent = selected ? "▸" : " ";
+        marker.textContent = selected ? (el === incomingEl ? "◀" : "▶") : " ";
         const ref = document.createElement("span");
         ref.textContent = entry.ref;
         row.appendChild(marker);
@@ -471,13 +521,20 @@ export function webviewHtml(assets: WebviewAssets): string {
     }
 
     window.addEventListener("message", (event) => {
-      setBusy(false);
       const msg = event.data || {};
+      if (msg.type === "operation") {
+        setOperation(msg);
+        if (msg.phase === "running") setBusy(true);
+        if (msg.phase === "idle") setBusy(false);
+        return;
+      }
+      setBusy(false);
       if (msg.type === "state") {
         closeOverlay();
         setStatus("");
         document.getElementById("file").textContent = "  " + (msg.fileName || "PDF");
         document.getElementById("location").textContent = msg.location || msg.cwd || "";
+        setCommandContext(msg);
         canBack = !!msg.canBack;
         document.getElementById("back").classList.toggle("show", canBack);
         neighbors = msg.neighbors || null;
@@ -485,15 +542,22 @@ export function webviewHtml(assets: WebviewAssets): string {
         index = 0;
         renderNeighborhood();
         renderLs(msg.ls || "");
+        history = Array.isArray(msg.history) ? msg.history : history;
+        if (input.value.trim().length === 0) requestCompletion(true);
       }
       if (msg.type === "overlay") {
         openOverlay(msg.title || "", msg.body || "");
+        if (Array.isArray(msg.history)) history = msg.history;
       }
       if (msg.type === "log") {
         setStatus(msg.log || "");
       }
       if (msg.type === "completions") {
         showSuggestions(msg.items, typeof msg.replaceFrom === "number" ? msg.replaceFrom : input.value.length);
+        if (completeOnResponse) {
+          completeOnResponse = false;
+          if (suggestItems.length > 0) acceptSuggestion(0, true);
+        }
       }
     });
 
@@ -501,14 +565,9 @@ export function webviewHtml(assets: WebviewAssets): string {
       e.preventDefault();
       if (focus !== "prompt") return;
       const line = input.value.trim();
-      if (!line || busy) return;
-      history.push(line);
+      if (!line) return;
       histPos = -1;
       input.value = "";
-      if (line === "history") {
-        openOverlay("history", history.length ? history.map((h, i) => (i + 1) + "  " + h).join("\\n") : "(empty)");
-        return;
-      }
       setBusy(true);
       vscode.postMessage({ type: "run", line });
     });
@@ -526,13 +585,21 @@ export function webviewHtml(assets: WebviewAssets): string {
     });
     graphEl.addEventListener("click", () => setFocus("graph"));
     objectEl.addEventListener("click", () => setFocus("object"));
-    input.addEventListener("focus", () => setFocus("prompt"));
+    input.addEventListener("focus", () => {
+      setFocus("prompt");
+      if (input.value.trim().length === 0) requestCompletion(true);
+    });
 
     input.addEventListener("input", () => {
-      if (suggestItems.length > 0) closeSuggestions();
+      completeOnResponse = false;
+      completionBaseValue = input.value;
+      completionBaseCursor = input.selectionStart || input.value.length;
+      if (input.value.trim().length === 0) requestCompletion(true);
+      else closeSuggestions();
     });
 
     document.addEventListener("keydown", (e) => {
+      if (e.defaultPrevented) return;
       if (e.key === "Escape") {
         if (suggestItems.length > 0) {
           e.preventDefault();
@@ -552,9 +619,14 @@ export function webviewHtml(assets: WebviewAssets): string {
         return;
       }
       if (busy) return;
-      if (e.key === "Tab" && !overlayOpen() && focus !== "prompt") {
+      if (e.key === "Tab" && e.shiftKey && !overlayOpen()) {
         e.preventDefault();
-        setFocus(focus === "graph" ? "object" : "prompt");
+        closeSuggestions();
+        setFocus(focus === "prompt" ? "graph" : focus === "graph" ? "object" : "prompt");
+        return;
+      }
+      if (e.key === "Tab" && !e.shiftKey && !overlayOpen()) {
+        e.preventDefault();
         return;
       }
       if (focus === "graph" && !overlayOpen()) {
@@ -578,14 +650,17 @@ export function webviewHtml(assets: WebviewAssets): string {
       if (e.key === "Tab") {
         e.preventDefault();
         if (busy) return;
-        if (input.value.trim().length === 0 && suggestItems.length === 0) {
+        if (e.shiftKey) {
+          closeSuggestions();
           setFocus("graph");
           return;
         }
         if (suggestItems.length === 0) {
+          completeOnResponse = true;
           requestCompletion();
         } else {
           suggestIndex = (suggestIndex + 1) % suggestItems.length;
+          acceptSuggestion(suggestIndex, true);
           renderSuggestions();
         }
         return;
@@ -622,6 +697,7 @@ export function webviewHtml(assets: WebviewAssets): string {
 
     setBusy(true);
     vscode.postMessage({ type: "ready" });
+    requestCompletion(true);
     setFocus("prompt");
     updateHint();
   </script>

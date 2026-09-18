@@ -5,6 +5,8 @@ export type CompletionContext = {
   neighborRefs: string[];
   /** Client-only command names not in the core grammar (e.g. the TUI's `history`). */
   extraCommands?: string[];
+  /** Override the display cap for an initial command list; contextual completion stays capped by default. */
+  maxItems?: number;
 };
 
 const FLAGS: Record<string, string[]> = {
@@ -35,12 +37,24 @@ export function complete(line: string, cursor: number, ctx: CompletionContext): 
   const head = before.slice(0, replaceFrom);
   const tokens = head.trim().split(/\s+/).filter(Boolean);
 
+  const command = tokens[0] ?? "";
+  if (REF_ARG_COMMANDS.has(command) && !partial.startsWith("-")) {
+    const commandEnd = before.indexOf(command) + command.length;
+    const argumentText = before.slice(commandEnd).trimStart();
+    const argumentStart = before.length - argumentText.length;
+    const refItems = ctx.neighborRefs.filter((ref) => ref.startsWith(argumentText));
+    return {
+      items: refItems.slice(0, ctx.maxItems ?? COMPLETION_MAX_ITEMS),
+      replaceFrom: argumentStart,
+    };
+  }
+
   const items = (() => {
     if (tokens.length === 0) {
       const names: readonly string[] = [...COMMAND_NAMES, ...(ctx.extraCommands ?? [])];
       return names.filter((c) => c.startsWith(partial));
     }
-    const cmd = tokens[0] ?? "";
+    const cmd = command;
     if (partial.startsWith("-")) {
       return (FLAGS[cmd] ?? []).filter((f) => f.startsWith(partial));
     }
@@ -50,5 +64,5 @@ export function complete(line: string, cursor: number, ctx: CompletionContext): 
     return [];
   })();
 
-  return { items: items.slice(0, COMPLETION_MAX_ITEMS), replaceFrom };
+  return { items: items.slice(0, ctx.maxItems ?? COMPLETION_MAX_ITEMS), replaceFrom };
 }

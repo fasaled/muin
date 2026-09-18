@@ -1,6 +1,6 @@
 {
   "name": "@fasaled/muin",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Explore a PDF’s internals from the terminal — objects, streams, page tree, and cross-references — as a navigable graph. Interactive TUI, one-shot commands, and an MCP server for agents.",
   "license": "MIT",
   "type": "module",
@@ -20,6 +20,7 @@
   ],
   "scripts": {
     "build": "bun build src/cli.ts --outfile dist/cli.js --target node --format esm --banner '#!/usr/bin/env node' && bun build ../core/src/worker/session-worker.ts --outfile dist/session-worker.js --target node --format esm && mkdir -p vendor && cp -R ../../vendor/qpdf vendor/",
+    "prepublishOnly": "bun run build",
     "start": "bun src/cli.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit -p tsconfig.json"
