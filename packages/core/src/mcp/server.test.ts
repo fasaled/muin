@@ -1,13 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
 import { bindSession } from "../session.ts";
 import { fakeAdapter, fixturePath, minimalSession } from "../test/helpers.ts";
-import { createMcpServer, MUIN_FOCUSED_PDF_FILE, readFocusedPdfPath } from "./server.ts";
+import { createMcpServer } from "./server.ts";
 
 async function connect(opts?: Parameters<typeof createMcpServer>[0]) {
   const server = createMcpServer(opts);
@@ -36,7 +33,6 @@ describe("MCP server", () => {
         "close",
         "export_graph",
         "find",
-        "focused",
         "help",
         "ls",
         "neighbors",
@@ -116,52 +112,5 @@ describe("MCP server", () => {
     expect(JSON.stringify(once.content)).toContain("no PDF was open");
     await client.close();
     await server.close();
-  });
-
-  test("focused reports the callback path", async () => {
-    const { client, server } = await connect({ focusedPdf: () => "/tmp/in-focus.pdf" });
-    const out = await client.callTool({ name: "focused", arguments: {} });
-    expect(JSON.stringify(out.content)).toContain("/tmp/in-focus.pdf");
-    await client.close();
-    await server.close();
-  });
-
-  test("open without path uses the focused PDF", async () => {
-    const opened: string[] = [];
-    const { client, server } = await connect({
-      focusedPdf: () => "/tmp/in-focus.pdf",
-      openSession: async (path) => {
-        opened.push(path);
-        return bindSession(minimalSession(path), fakeAdapter());
-      },
-    });
-    await client.callTool({ name: "open", arguments: {} });
-    expect(opened.some((p) => p.endsWith("in-focus.pdf"))).toBe(true);
-    await client.close();
-    await server.close();
-  });
-
-  test("open without path fails when nothing is focused", async () => {
-    const { client, server } = await connect({ openSession: fakeOpen() });
-    const out = await client.callTool({ name: "open", arguments: {} });
-    expect(JSON.stringify(out)).toMatch(/focused/i);
-    await client.close();
-    await server.close();
-  });
-});
-
-describe("readFocusedPdfPath", () => {
-  test("reads the hint file the VS Code extension writes", () => {
-    const dir = mkdtempSync(join(tmpdir(), "muin-focus-"));
-    const file = join(dir, "focused-pdf");
-    writeFileSync(file, "/abs/doc.pdf\n");
-    expect(readFocusedPdfPath({ [MUIN_FOCUSED_PDF_FILE]: file })).toBe("/abs/doc.pdf");
-  });
-
-  test("empty hint file means nothing focused", () => {
-    const dir = mkdtempSync(join(tmpdir(), "muin-focus-"));
-    const file = join(dir, "focused-pdf");
-    writeFileSync(file, "");
-    expect(readFocusedPdfPath({ [MUIN_FOCUSED_PDF_FILE]: file })).toBeUndefined();
   });
 });

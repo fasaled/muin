@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun run --filter @fasaled/muin build && bun run --filter muin build",
+    "build": "bun run --filter @fasaled/muin build",
     "test": "bun test",
     "typecheck": "bun run --filter '*' typecheck",
     "start": "bun packages/cli/src/cli.ts"

@@ -16,9 +16,9 @@ export type SessionSnapshot = {
 
 export type SessionOptions = {
   maxBytes?: number;
-  /** Absolute path to the bundled session-worker.js. Required from VS Code’s CJS bundle. */
+  /** Absolute path to the bundled session-worker.js, for hosts that bundle it separately from the caller. */
   workerScript?: string;
-  /** Fork a child process instead of a worker thread. VS Code must set this — WASM in an Electron worker can take down the window. */
+  /** Fork a child process instead of a worker thread. Needed by embedders where WASM in a worker thread can take down the host process (e.g. Electron). */
   workerProcess?: boolean;
 };
 

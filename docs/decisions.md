@@ -148,8 +148,16 @@ Each entry: context, decision, consequences.
 
 ## D19 — TUI runs in the alternate screen; the overlay scrolls itself
 
-**Context:** The TUI initially rendered inline (Ink's default), which read as a growing terminal transcript rather than an application — the opposite of the fixed-panel, no-log design in this doc's TUI/VS Code section. It also made "muin's box vs. everything else on screen" ambiguous.
+**Context:** The TUI initially rendered inline (Ink's default), which read as a growing terminal transcript rather than an application — the opposite of the fixed-panel, no-log design in this doc's TUI UI model. It also made "muin's box vs. everything else on screen" ambiguous.
 
 **Decision:** `render(<App/>, { alternateScreen: true })` — Ink 7's built-in full-screen mode, the same mechanism `vim`/`htop`/`lazygit` use. The alternate screen has no scrollback, so any content taller than the terminal would otherwise be permanently unreachable; the `Overlay` component compensates by measuring its own height (`measureElement`) and paginating with `↑`/`↓`/`PageUp`/`PageDown` instead of relying on the terminal.
 
-**Consequences:** The terminal's prior contents return unchanged on exit, and the app now has a real screen to lay out (see `docs/design.md`'s "TUI and VS Code UI model": centered, width-capped, vertically distributed via `useStdout`). Every long-output surface (currently only `Overlay`) is responsible for its own scrolling; a future pane that can grow unbounded needs the same treatment, not a plain `<Text>`.
+**Consequences:** The terminal's prior contents return unchanged on exit, and the app now has a real screen to lay out (see `docs/design.md`'s "TUI UI model": centered, width-capped, vertically distributed via `useStdout`). Every long-output surface (currently only `Overlay`) is responsible for its own scrolling; a future pane that can grow unbounded needs the same treatment, not a plain `<Text>`.
+
+## D20 — VS Code extension removed
+
+**Context:** `packages/vscode` shipped a webview panel and a Copilot MCP provider alongside the TUI and CLI MCP server (see D11–D15 above, and `implementation-proposal.md`). Maintaining a third client — webview UI, extension packaging, `.vsix` releases — split effort that was better spent on the CLI's TUI and MCP surfaces, which cover both human and agent use without an editor dependency.
+
+**Decision:** Drop `packages/vscode` and the VS Code-only bits of `@muin/core` (the MCP `focused` tool and `MUIN_FOCUSED_PDF_FILE` hint file, `workerScript`/`workerProcess` no longer need a VS Code caller though the options remain generally useful). Effort concentrates on the CLI's TUI and MCP.
+
+**Consequences:** Two clients remain: TUI/REPL and MCP, both via `@fasaled/muin`. D11–D15 stay in this document as the historical record of why the extension existed and how it was built; they no longer describe a shipped artifact.

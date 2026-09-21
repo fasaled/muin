@@ -1,5 +1,7 @@
 # Implementation Proposal — Muin, a PDF Internal Structure Explorer
 
+> **Historical note:** this document is the original proposal, kept as-is for context. It described a VS Code extension as a third client; that extension was later built and then removed (see `docs/decisions.md`, D20) to focus development on the TUI and MCP server.
+
 ## Summary
 
 **Muin** is a tool that represents the internal structure of a PDF file — indirect objects, streams, page tree, cross-references — as a navigable graph. It exposes the same functionality to three clients on top of a single command core with no duplicated logic: a person at the terminal (interactive TUI), an automated agent (MCP server, available both via the CLI and auto-registered inside VS Code), and a person inside VS Code (a visual graph panel, with a command box).

@@ -11,7 +11,7 @@ import type { MuinSession, SessionOptions } from "./session-local.ts";
 
 /**
  * Open a PDF. WASM/`callMain` run on a worker thread so the TUI and
- * VS Code extension host stay responsive.
+ * embedding host stay responsive.
  */
 export async function createSession(filePath: string, options: SessionOptions = {}): Promise<MuinSession> {
   return createWorkerSession(filePath, options);

@@ -18,9 +18,7 @@ function workerCandidates(dir: string, name: string): string[] {
     join(dir, name),
     join(dir, "worker", name),
     join(dir, "dist", name),
-    join(dir, "vscode", "dist", name),
     join(dir, "cli", "dist", name),
-    join(dir, "packages", "vscode", "dist", name),
     join(dir, "packages", "cli", "dist", name),
   ];
 }

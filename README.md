@@ -4,13 +4,10 @@
 
 A tool that represents the internal structure of a PDF file — indirect objects, streams, page tree, cross-references — as a navigable graph.
 
-Three clients share one command core. You install **either** the CLI **or** the VS Code extension; neither requires the other.
-
 | Client | How to get it | What you get |
 |---|---|---|
 | TUI / REPL | `npm install -g @fasaled/muin` | `muin file.pdf` |
 | MCP (terminal / agents) | same CLI | `muin --mcp file.pdf` |
-| VS Code panel + Copilot MCP | Marketplace extension `fasaled.muin` | **Muin: Explore PDF**; MCP registered automatically |
 
 The unscoped npm name `muin` is blocked by npm’s similarity filter. The CLI package is `@fasaled/muin`; the command is still `muin`.
 
@@ -60,25 +57,20 @@ Completes flags, `*.pdf` files, and one-shot command names (`ls`, `find`, …). 
 
 The TUI has two state panes that redraw in place — the current object's neighborhood (incoming/outgoing refs) and the object itself — plus a command panel, all always visible; the panes themselves never scroll. The command panel shows the file, cwd, active operation, queue, initial command candidates, and prompt. `Tab` completes and cycles candidates; `Shift+Tab` changes focus between prompt, graph, and object. While the graph is focused, `←`/`→` pick a pane, `↑`/`↓` pick a neighbor, and `Enter` does the equivalent of `cd <ref>`. Any command other than `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, `cat`, `stream`, …) opens or appends to the activity panel over the graph; if it is taller than the screen, `↑`/`↓`/`PageUp`/`PageDown` scroll it and `Esc` closes it. `cd`/`back` always close that panel and refresh both state panes.
 
-Typing a partial command, flag, or multi-token ref and pressing `Tab` completes it using the same completion source in both clients. Repeated `Tab` cycles every candidate, keeping the active candidate visible and highlighted; `Enter` confirms it and `Esc` cancels. Command history is persistent, stored locally by the CLI and per PDF in VS Code. New commands are queued while an operation is running, with active and queue state shown in the command panel. The VS Code panel mirrors this layout and uses the same `Tab`/`Shift+Tab` behavior; it does not use a dropdown completion menu.
+Typing a partial command, flag, or multi-token ref and pressing `Tab` completes it using the same completion source. Repeated `Tab` cycles every candidate, keeping the active candidate visible and highlighted; `Enter` confirms it and `Esc` cancels. Command history is persistent, stored locally by the CLI. New commands are queued while an operation is running, with active and queue state shown in the command panel.
 
 Requires Node.js 18+. If stdin is not a TTY, the CLI uses a line-oriented REPL instead of Ink. Encrypted PDFs are not supported.
 
-MCP is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. In VS Code, `open` may omit the path to use the focused PDF (the active tab if it is a `.pdf`, otherwise the file in the Muin panel); `focused` returns that path. The TUI still takes the file on the command line. One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit — useful in scripts; they do not keep `cd` state.
-
-## VS Code
-
-Install the **Muin** extension from the Marketplace, or install a local build with `code --install-extension packages/vscode/muin-0.2.1.vsix`. Run **Muin: Explore PDF**, pick a file. The panel mirrors the TUI: incoming / current / outgoing neighbors, the current object (`ls`), activity history, and the same command panel. Click a neighbor (or a ref in the object pane) to `cd`; `Tab` completes, `Shift+Tab` changes focus, and arrows / `Enter` / `Esc` match the TUI. Copilot agent mode discovers Muin’s MCP tools without editing `mcp.json` and should `open` a workspace PDF itself. The extension does **not** spawn the `muin` CLI; it bundles the core and qpdf WASM in the `.vsix`.
+MCP is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. The TUI still takes the file on the command line. One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit — useful in scripts; they do not keep `cd` state.
 
 ## Commands
 
-| Command | TUI | MCP | VS Code |
-|---|---|---|---|
-| `ls` `cd` `pwd` `back` `refs` `neighbors` `cat` `stream` `find` `tree` `check` `help` | yes | yes | yes |
-| `open` / `close` | no | yes | MCP only (`open` can omit path → focused PDF) |
-| `focused` | no | yes (VS Code) | MCP: path of the focused PDF |
-| `export_graph` | JSON text | yes | MCP / one-shot (panel uses `neighbors`) |
-| `quit` / `exit` | yes | no | close the panel |
+| Command | TUI | MCP |
+|---|---|---|
+| `ls` `cd` `pwd` `back` `refs` `neighbors` `cat` `stream` `find` `tree` `check` `help` | yes | yes |
+| `open` / `close` | no | yes |
+| `export_graph` | JSON text | yes |
+| `quit` / `exit` | yes | no |
 
 `cd` accepts `O G R`, `O,G`, a dictionary key (`/Pages`), or an array index.
 
@@ -99,7 +91,7 @@ bun run build
 bun packages/cli/src/cli.ts fixtures/pdf/minimal.pdf
 ```
 
-This is a Bun workspace: `packages/core` (private), `packages/cli` (`@fasaled/muin`), `packages/vscode` (extension).
+This is a Bun workspace: `packages/core` (private), `packages/cli` (`@fasaled/muin`).
 
 ## Development process
 

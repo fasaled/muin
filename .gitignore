@@ -119,5 +119,3 @@ dist
 
 # Copied into publish artifacts at build time from repo-root vendor/qpdf
 packages/cli/vendor/
-packages/vscode/vendor/
-packages/vscode/media/

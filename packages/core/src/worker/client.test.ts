@@ -32,36 +32,9 @@ describe.skipIf(!wasmReady)("createWorkerSession", () => {
   test("propagates typed errors from the worker", async () => {
     await expect(createWorkerSession("fixtures/pdf/minimal.pdf", { maxBytes: 1 })).rejects.toThrow(LimitError);
   });
-
-  const bundledWorker = join(process.cwd(), "packages/vscode/dist/session-worker.js");
-
-  test.skipIf(!existsSync(bundledWorker))("opens a PDF with the VS Code bundled worker script", async () => {
-    const session = await createWorkerSession("fixtures/pdf/minimal.pdf", { workerScript: bundledWorker });
-    try {
-      const pwd = await session.run("pwd");
-      expect(pwd.kind).toBe("text");
-      if (pwd.kind === "text") expect(pwd.text).toContain("1 0 R");
-    } finally {
-      session.close();
-    }
-  });
-
-  test.skipIf(!existsSync(bundledWorker))("opens a PDF in a forked child process (VS Code isolation)", async () => {
-    const session = await createWorkerSession("fixtures/pdf/minimal.pdf", {
-      workerScript: bundledWorker,
-      workerProcess: true,
-    });
-    try {
-      const pwd = await session.run("pwd");
-      expect(pwd.kind).toBe("text");
-      if (pwd.kind === "text") expect(pwd.text).toContain("1 0 R");
-    } finally {
-      session.close();
-    }
-  });
 });
 
-describe("Node worker_threads (VS Code extension host)", () => {
+describe("Node worker_threads", () => {
   test("can load the TypeScript worker (strip-only, no parameter properties)", async () => {
     const proc = Bun.spawn(
       [
