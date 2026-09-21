@@ -105,7 +105,6 @@ Design, decisions, and code are developed in collaboration with AI coding agents
 | [docs/decisions.md](docs/decisions.md) | Technical decisions |
 | [docs/wasm.md](docs/wasm.md) | qpdf download and compile |
 | [docs/agents.md](docs/agents.md) | How this repo is built |
-| [implementation-proposal.md](implementation-proposal.md) | Original proposal (historical) |
 
 ## License
 

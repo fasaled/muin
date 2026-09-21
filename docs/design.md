@@ -1,6 +1,6 @@
 # Muin design
 
-Living spec. Implement against this document, not against `implementation-proposal.md`.
+Living spec. Implement against this document.
 
 Muin treats a PDF’s indirect objects as a navigable graph (outgoing refs from the file, incoming refs from a reverse index). **One command core**, two clients:
 

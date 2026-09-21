@@ -82,53 +82,49 @@ Each entry: context, decision, consequences.
 
 **Consequences:** Slightly more to maintain; agents have a required reading list.
 
-## D11 — Private workspace core, two artifacts
+## D11 — Private workspace core, one artifact
 
-**Context:** CLI and VS Code must share commands without the person installing an extra npm package, and without the extension spawning `muin`.
+**Context:** The CLI needs the graph engine, adapter, and command core without the person installing an extra npm package.
 
-**Decision:** `@muin/core` is a private Bun workspace package. `@fasaled/muin` and the vsix each bundle it. `@muin/core` is not published to npm.
+**Decision:** `@muin/core` is a private Bun workspace package. `@fasaled/muin` bundles it. `@muin/core` is not published to npm.
 
-**Consequences:** One version in the repo; both consumers bump together. `createSession` is the only supported way to open a PDF.
+**Consequences:** One version in the repo. `createSession` is the only supported way to open a PDF.
 
-## D12 — VS Code MCP is a vsix stdio script
+## D12 — RETIRED (VS Code MCP provider)
 
-**Context:** VS Code discovers MCP via `McpStdioServerDefinition`, which starts a child process.
+Retired by D20. The VS Code extension no longer exists; there is no `.vsix` MCP
+child process. Full text preserved in git history
+(`git log --follow -- docs/decisions.md`).
 
-**Decision:** The child is `node dist/mcp-stdio.js <pdf>` inside the vsix, calling `serveMcpStdio`. Never the published CLI binary.
+## D13 — RETIRED (VS Code webview panel)
 
-**Consequences:** Copilot does not need `mcp.json`. Panel and agent sessions are separate processes/WASM instances.
-
-## D13 — Graph in the webview only
-
-**Context:** qpdf WASM is Node-oriented (`callMain`, MEMFS). A vis-network plot of `export_graph` did not match the TUI (neighborhood of the current object) and clicks did not feel like `cd`.
-
-**Decision:** The webview renders the same `neighbors` + `ls` panes as the TUI (HTML/CSS, no graph library). The extension host runs `neighbors` / `ls` / `cd` and posts JSON. Mouse clicks are `cd`; keyboard matches the TUI.
-
-**Consequences:** No WASM in the browser. No vis-network dependency. `export_graph` remains an MCP / one-shot tool, not the panel’s data source.
+Retired by D20. The VS Code extension no longer exists; there is no webview
+panel. Full text preserved in git history
+(`git log --follow -- docs/decisions.md`).
 
 ## D14 — No GitHub Actions
 
 **Context:** Hosted Actions consume the private-repo minute quota (WASM compile was especially expensive).
 
-**Decision:** No workflows under `.github/workflows`. Tests, typecheck, and builds run locally (`bun test`, `bun run build`). qpdf WASM is vendored and rebuilt with Docker on a developer machine. Version tags and GitHub Releases are created locally with `gh release create` (notes + the source archives GitHub attaches automatically). Do not attach npm tarballs or vsix files to the GitHub Release.
+**Decision:** No workflows under `.github/workflows`. Tests, typecheck, and builds run locally (`bun test`, `bun run build`). qpdf WASM is vendored and rebuilt with Docker on a developer machine. Version tags and GitHub Releases are created locally with `gh release create` (notes + the source archives GitHub attaches automatically). Do not attach npm tarballs to the GitHub Release.
 
 **Consequences:** Nothing runs on push. Cutting a release is `gh release create vX.Y.Z --generate-notes` after the version bump is on `main`.
 
 ## D15 — WASM `callMain` on a worker thread
 
-**Context:** `callMain` is synchronous C++ in WASM. On the TUI process it froze the prompt; on the VS Code extension host it stalled the panel’s message loop. It does not run on the editor renderer (already a separate process). Moving it to a worker does not shrink CPU time for qpdf or `JSON.parse`.
+**Context:** `callMain` is synchronous C++ in WASM. On the TUI process it froze the prompt. Moving it to a worker does not shrink CPU time for qpdf or `JSON.parse`.
 
-**Decision:** `createSession` opens a `worker_threads` Worker that owns the adapter, MEMFS, and graph. The main thread holds a cached `snapshot()` and talks via sequenced RPC (`open` / `run` / `runCommand` / `close`). Tests that do not need WASM keep using `bindSession` in-process. Bundles emit `dist/session-worker.js` beside the CLI and the vsix.
+**Decision:** `createSession` opens a `worker_threads` Worker that owns the adapter, MEMFS, and graph. The main thread holds a cached `snapshot()` and talks via sequenced RPC (`open` / `run` / `runCommand` / `close`). Tests that do not need WASM keep using `bindSession` in-process. Bundles emit `dist/session-worker.js` beside the CLI.
 
-**Consequences:** Opening a PDF is still as slow as qpdf, but the prompt and extension host stay responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API). The VS Code **panel** forks `session-worker.js` as a child (`ELECTRON_RUN_AS_NODE`) instead of `worker_threads`: qpdf WASM aborting in an Electron worker thread takes down the whole window.
+**Consequences:** Opening a PDF is still as slow as qpdf, but the prompt stays responsive. Memory is one WASM heap **per session** (the worker), plus IPC copies of command results. MCP stdio was already a child process; it now has a worker inside that process as well (small extra RAM, consistent API).
 
 ## D16 — MCP is a server; the agent opens and closes PDFs
 
 **Context:** Binding MCP to `muin --mcp file.pdf` copied the TUI model (one human, one file, one process). An agent already holds a long-lived stdio connection and should choose documents over that connection.
 
-**Decision:** MCP starts with no PDF. Tools `open` (path, optional maxBytes) and `close` own the worker session. Query tools require an open session (`no PDF is open; call the open tool first`). `open` replaces a previous PDF. One active PDF per MCP process. CLI `muin --mcp` is the normal form; `muin --mcp file.pdf` still pre-opens for scripts. VS Code always advertises MCP without a file picker.
+**Decision:** MCP starts with no PDF. Tools `open` (path, optional maxBytes) and `close` own the worker session. Query tools require an open session (`no PDF is open; call the open tool first`). `open` replaces a previous PDF. One active PDF per MCP process. CLI `muin --mcp` is the normal form; `muin --mcp file.pdf` still pre-opens for scripts.
 
-**Consequences:** Copilot can `open` any workspace PDF. In VS Code, `open` with no path (and the `focused` tool) use the PDF in the active tab, or the file already in the Muin panel — the extension writes that path to a hint file the MCP child reads. TUI is unchanged. Concurrent PDFs in one MCP connection are out of scope.
+**Consequences:** TUI is unchanged. Concurrent PDFs in one MCP connection are out of scope.
 
 ## D17 — One-shot CLI commands
 
@@ -156,8 +152,8 @@ Each entry: context, decision, consequences.
 
 ## D20 — VS Code extension removed
 
-**Context:** `packages/vscode` shipped a webview panel and a Copilot MCP provider alongside the TUI and CLI MCP server (see D11–D15 above, and `implementation-proposal.md`). Maintaining a third client — webview UI, extension packaging, `.vsix` releases — split effort that was better spent on the CLI's TUI and MCP surfaces, which cover both human and agent use without an editor dependency.
+**Context:** `packages/vscode` shipped a webview panel and a Copilot MCP provider alongside the TUI and CLI MCP server. Maintaining a third client — webview UI, extension packaging, `.vsix` releases — split effort that was better spent on the CLI's TUI and MCP surfaces, which cover both human and agent use without an editor dependency.
 
-**Decision:** Drop `packages/vscode` and the VS Code-only bits of `@muin/core` (the MCP `focused` tool and `MUIN_FOCUSED_PDF_FILE` hint file, `workerScript`/`workerProcess` no longer need a VS Code caller though the options remain generally useful). Effort concentrates on the CLI's TUI and MCP.
+**Decision:** Drop `packages/vscode` and the VS Code-only bits of `@muin/core` (the MCP `focused` tool and `MUIN_FOCUSED_PDF_FILE` hint file; `workerScript`/`workerProcess` remain as generally useful session options). Effort concentrates on the CLI's TUI and MCP.
 
-**Consequences:** Two clients remain: TUI/REPL and MCP, both via `@fasaled/muin`. D11–D15 stay in this document as the historical record of why the extension existed and how it was built; they no longer describe a shipped artifact.
+**Consequences:** Two clients remain: TUI/REPL and MCP, both via `@fasaled/muin`. D12–D13 above are retired stubs; D11, D15, and D16 were edited to remove extension scope. The full extension design is preserved in git history, not in this document.

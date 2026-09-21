@@ -72,9 +72,8 @@ typings/
 # Optional REPL history
 .node_repl_history
 
-# Output of 'npm pack' / vsce
+# Output of 'npm pack'
 *.tgz
-*.vsix
 
 # Yarn Integrity file
 .yarn-integrity

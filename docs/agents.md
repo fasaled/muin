@@ -4,10 +4,9 @@ This repository is implemented from a written spec by coding agents as well as h
 
 ## Origin
 
-1. `implementation-proposal.md` — original product proposal (historical).
-2. `docs/design.md` — living spec. **Implement against this.**
-3. `docs/decisions.md` — locked technical decisions. Do not silently reverse them.
-4. Stacked implementation: scaffold → model → qpdf JSON → WASM/adapter → graph → commands → CLI → TUI → MCP → packaging.
+1. `docs/design.md` — living spec. **Implement against this.**
+2. `docs/decisions.md` — locked technical decisions. Do not silently reverse them.
+3. Stacked implementation: scaffold → model → qpdf JSON → WASM/adapter → graph → commands → CLI → TUI → MCP → packaging.
 
 ## Required reading (in order)
 
