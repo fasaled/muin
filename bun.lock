@@ -11,7 +11,7 @@
     },
     "packages/cli": {
       "name": "@fasaled/muin",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "bin": {
         "muin": "dist/cli.js",
       },
@@ -29,7 +29,7 @@
     },
     "packages/core": {
       "name": "@muin/core",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
         "zod": "^4.6.5",

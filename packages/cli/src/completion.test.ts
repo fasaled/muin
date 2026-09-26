@@ -19,6 +19,8 @@ describe("completion", () => {
       const script = completionScript(shell);
       expect(script).toContain("export_graph");
       expect(script.includes("--mcp") || script.includes("-l mcp")).toBe(true);
+      expect(script.includes("--events") || script.includes("-l events")).toBe(true);
+      expect(script.includes("--follow") || script.includes("-l follow")).toBe(true);
       expect(script).toContain(".pdf");
     });
   }

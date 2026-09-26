@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { LimitError, NotFoundError, UsageError } from "../errors.ts";
 import { openSession } from "../graph/session.ts";
-import { fakeAdapter, loadMinimalStructure, minimalSession } from "../test/helpers.ts";
+import { addStreamObject, fakeAdapter, loadMinimalStructure, minimalSession } from "../test/helpers.ts";
 import { runLine } from "./core.ts";
 import { parseCommand } from "./parse.ts";
 
@@ -43,13 +43,16 @@ describe("runLine", () => {
     expect(ls.result.kind).toBe("text");
     if (ls.result.kind === "text") expect(ls.result.text).toContain("/Pages");
     const cd = await runLine(session(), "cd /Pages");
-    expect(cd.session.cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(cd.session.cwd).toEqual({ objectNumber: 2, generation: 0 });
   });
 
   test("find streams with FlateDecode", async () => {
-    const out = await runLine(session(), 'find --type Stream --where "/Filter == /FlateDecode"');
+    const structure = loadMinimalStructure();
+    addStreamObject(structure);
+    const s = openSession("minimal.pdf", structure);
+    const out = await runLine(s, 'find --type Stream --where "/Filter == /FlateDecode"');
     expect(out.result.kind).toBe("text");
-    if (out.result.kind === "text") expect(out.result.text).toContain("5 0 R");
+    if (out.result.kind === "text") expect(out.result.text).toContain("4 0 R");
   });
 
   test("refs incoming and outgoing", async () => {
@@ -59,7 +62,7 @@ describe("runLine", () => {
     expect(refs.result.kind).toBe("text");
     if (refs.result.kind === "text") {
       expect(refs.result.text).toContain("outgoing");
-      expect(refs.result.text).toContain("4 0 R");
+      expect(refs.result.text).toContain("3 0 R");
       expect(refs.result.text).toContain("incoming");
       expect(refs.result.text).toContain("1 0 R");
     }
@@ -79,8 +82,8 @@ describe("runLine", () => {
     const out = await runLine(session(), "tree --depth 2");
     expect(out.result.kind).toBe("text");
     if (out.result.kind === "text") {
+      expect(out.result.text).toContain("2 0 R");
       expect(out.result.text).toContain("3 0 R");
-      expect(out.result.text).toContain("4 0 R");
     }
   });
 
@@ -94,7 +97,7 @@ describe("runLine", () => {
         incoming: { entries: unknown[]; total: number };
         outgoing: { entries: unknown[]; total: number };
       };
-      expect(nb.current.ref).toBe("3 0 R");
+      expect(nb.current.ref).toBe("2 0 R");
       expect(nb.current.kind).toBe("/Pages");
       expect(nb.outgoing.total).toBeGreaterThan(0);
       expect(nb.outgoing.entries.length).toBeLessThanOrEqual(nb.outgoing.total);
@@ -108,7 +111,7 @@ describe("runLine", () => {
 
   test("tree terminates and marks a cycle in the page tree", async () => {
     const structure = loadMinimalStructure();
-    const page = structure.objects["4 0 R"];
+    const page = structure.objects["3 0 R"];
     if (page && page.value.kind === "dict") {
       page.value.entries["/Kids"] = {
         kind: "array",
@@ -144,7 +147,10 @@ describe("runLine", () => {
 
   test("stream and check use the adapter", async () => {
     const adapter = fakeAdapter();
-    const stream = await runLine(session(), "stream 5 0 R --raw", adapter);
+    const structure = loadMinimalStructure();
+    addStreamObject(structure);
+    const s = openSession("minimal.pdf", structure);
+    const stream = await runLine(s, "stream 4 0 R --raw", adapter);
     expect(stream.result.kind).toBe("bytes");
     if (stream.result.kind === "bytes") expect([...stream.result.bytes]).toEqual([1, 2, 3, 4]);
 
@@ -160,7 +166,10 @@ describe("runLine", () => {
 
   test("stream without a ref reads the current object", async () => {
     const adapter = fakeAdapter();
-    const atStream = await runLine(session(), "cd 5 0 R", adapter);
+    const structure = loadMinimalStructure();
+    addStreamObject(structure);
+    const s = openSession("minimal.pdf", structure);
+    const atStream = await runLine(s, "cd 4 0 R", adapter);
     const out = await runLine(atStream.session, "stream", adapter);
     expect(out.result.kind).toBe("bytes");
     if (out.result.kind === "bytes") expect([...out.result.bytes]).toEqual([1, 2, 3, 4]);
@@ -184,7 +193,7 @@ describe("runLine", () => {
     expect(found.result.kind).toBe("json");
     if (found.result.kind === "json") {
       const g = found.result.value as { nodes: { ref: string }[] };
-      expect(g.nodes.some((n) => n.ref === "4 0 R")).toBe(true);
+      expect(g.nodes.some((n) => n.ref === "3 0 R")).toBe(true);
     }
     await expect(runLine(session(), "export_graph --depth 9")).rejects.toThrow(LimitError);
   });

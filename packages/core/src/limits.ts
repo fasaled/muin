@@ -14,6 +14,8 @@ export const MCP_STREAM_MAX_BYTES = 2 * 1024 * 1024;
 export const TEXT_PREVIEW_MAX_CHARS = 500_000;
 /** Hex dump cap for binary stream previews — beyond this, a byte-for-byte hex view isn't useful reading. */
 export const BINARY_PREVIEW_MAX_BYTES = 8 * 1024;
+/** Per-event result preview cap in the observation journal. The journal is append-per-operation, so previews stay small; the follower's own session holds full output. */
+export const JOURNAL_PREVIEW_MAX_CHARS = 4_000;
 
 export function assertFileSize(byteLength: number, maxBytes = DEFAULT_MAX_BYTES): void {
   if (byteLength > maxBytes) {

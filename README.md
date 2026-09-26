@@ -9,7 +9,7 @@ A tool that represents the internal structure of a PDF file — indirect objects
 | TUI / REPL | `npm install -g @fasaled/muin` | `muin file.pdf` |
 | MCP (terminal / agents) | same CLI | `muin --mcp file.pdf` |
 
-The unscoped npm name `muin` is blocked by npm’s similarity filter. The CLI package is `@fasaled/muin`; the command is still `muin`.
+The CLI package is `@fasaled/muin`; the command is still `muin`.
 
 ## CLI
 
@@ -24,6 +24,8 @@ muin document.pdf ls 3 0 R
 muin document.pdf find --type Stream --where "/Filter == /FlateDecode"
 muin --mcp
 muin --mcp document.pdf          # optional: pre-open this file
+muin --mcp --events live.jsonl  # journal every operation; watch it with `muin --follow live.jsonl`
+muin --follow live.jsonl        # read-only observer of a journaled agent session
 muin --max-bytes 10485760 document.pdf
 muin help
 muin --help
@@ -55,13 +57,15 @@ muin completion powershell | Out-String | Invoke-Expression
 
 Completes flags, `*.pdf` files, and one-shot command names (`ls`, `find`, …). It does not open the PDF to complete object refs.
 
-The TUI has two state panes that redraw in place — the current object's neighborhood (incoming/outgoing refs) and the object itself — plus a command panel, all always visible; the panes themselves never scroll. The command panel shows the file, cwd, active operation, queue, initial command candidates, and prompt. `Tab` completes and cycles candidates; `Shift+Tab` changes focus between prompt, graph, and object. While the graph is focused, `←`/`→` pick a pane, `↑`/`↓` pick a neighbor, and `Enter` does the equivalent of `cd <ref>`. Any command other than `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, `cat`, `stream`, …) opens or appends to the activity panel over the graph; if it is taller than the screen, `↑`/`↓`/`PageUp`/`PageDown` scroll it and `Esc` closes it. `cd`/`back` always close that panel and refresh both state panes.
+The TUI has two state panes that redraw in place — the current object's neighborhood (incoming/outgoing refs) and the object itself — plus a command panel, all always visible; the panes themselves never scroll. The command panel shows the file, cwd, active operation, queue, last executed command, initial command candidates, and prompt. `Tab` completes and cycles candidates; `Shift+Tab` changes focus between prompt, graph, and object. While the graph is focused, `←`/`→` pick a pane, `↑`/`↓` pick a neighbor, and `Enter` does the equivalent of `cd <ref>`. Any command other than `cd`/`back` (`find`, `tree`, `check`, `help`, `history`, `cat`, `stream`, …) opens or appends to the activity panel over the graph; if it is taller than the screen, `↑`/`↓`/`PageUp`/`PageDown` scroll it and `Esc` closes it. `cd`/`back` always close that panel and refresh both state panes.
 
 Typing a partial command, flag, or multi-token ref and pressing `Tab` completes it using the same completion source. Repeated `Tab` cycles every candidate, keeping the active candidate visible and highlighted; `Enter` confirms it and `Esc` cancels. Command history is persistent, stored locally by the CLI. New commands are queued while an operation is running, with active and queue state shown in the command panel.
 
 Requires Node.js 18+. If stdin is not a TTY, the CLI uses a line-oriented REPL instead of Ink. Encrypted PDFs are not supported.
 
 MCP is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. The TUI still takes the file on the command line. One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit — useful in scripts; they do not keep `cd` state.
+
+Observing an agent session: start the server with `muin --mcp --events live.jsonl` (e.g. in the agent's MCP config args) and open `muin --follow live.jsonl` in another terminal. Each `open` rotates a previous journal aside (`live-<timestamp>.jsonl`) and starts fresh, so every opened PDF gets its own file. The follower is read-only — no prompt, no history, no way to type commands — and shows the agent's operations as a scrubbable timeline: `←`/`→` step through operations, `Space` auto-plays them at a human pace (`+`/`-` speed), `g`/`G` jump to the first/last. Overlay scrolling (`↑`/`↓`/`PageUp`/`PageDown`, `Esc` closes) and exit (`Esc`, `Ctrl+C`) work exactly like the TUI.
 
 ## Use Cases
 

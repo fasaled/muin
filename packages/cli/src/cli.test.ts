@@ -71,6 +71,32 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["--max-bytes", "nope", "a.pdf"])).toThrow(UsageError);
     expect(() => parseArgs(["--max-bytes"])).toThrow(UsageError);
   });
+
+  test("--events requires and follows --mcp", () => {
+    expect(parseArgs(["--mcp", "--events", "live.jsonl"])).toEqual({ mode: "mcp", events: "live.jsonl" });
+    expect(parseArgs(["--mcp", "doc.pdf", "--events", "live.jsonl"])).toEqual({
+      mode: "mcp",
+      file: "doc.pdf",
+      events: "live.jsonl",
+    });
+    expect(parseArgs(["--mcp", "--max-bytes", "1024", "--events", "live.jsonl"])).toEqual({
+      mode: "mcp",
+      maxBytes: 1024,
+      events: "live.jsonl",
+    });
+    expect(() => parseArgs(["--events", "live.jsonl"])).toThrow(UsageError);
+    expect(() => parseArgs(["--events"])).toThrow(UsageError);
+    expect(() => parseArgs(["doc.pdf", "--events", "live.jsonl"])).toThrow(UsageError);
+  });
+
+  test("--follow is standalone and exclusive", () => {
+    expect(parseArgs(["--follow", "live.jsonl"])).toEqual({ mode: "follow", journal: "live.jsonl" });
+    expect(() => parseArgs(["--follow"])).toThrow(UsageError);
+    expect(() => parseArgs(["--follow", "live.jsonl", "doc.pdf"])).toThrow(UsageError);
+    expect(() => parseArgs(["--follow", "live.jsonl", "--mcp"])).toThrow(UsageError);
+    expect(() => parseArgs(["--follow", "live.jsonl", "--events", "other.jsonl"])).toThrow(UsageError);
+    expect(() => parseArgs(["--follow", "live.jsonl", "--max-bytes", "1024"])).toThrow(UsageError);
+  });
 });
 
 describe("joinCommandLine", () => {

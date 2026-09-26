@@ -34,15 +34,25 @@ describe.skipIf(!wasmReady)("createWorkerSession", () => {
   });
 });
 
-describe("Node worker_threads", () => {
-  test("can load the TypeScript worker (strip-only, no parameter properties)", async () => {
+describe.skipIf(!wasmReady)("Node loads the bundled session worker", () => {
+  // Plain node only ever resolves session-worker.js (see resolveSessionWorker) — the
+  // TypeScript source is a Bun-only fallback. Exercise the shipped path: build the
+  // bundle, then open a PDF with it from a real node worker_threads host.
+  test("opens a PDF in plain node worker_threads", async () => {
+    const built = await Bun.spawn(["bun", "run", "build"], {
+      cwd: process.cwd(),
+      stdout: "pipe",
+      stderr: "pipe",
+    }).exited;
+    expect(built).toBe(0);
+
     const proc = Bun.spawn(
       [
         "node",
         "-e",
         `const { Worker } = require("worker_threads");
 const path = require("path");
-const script = path.resolve(${JSON.stringify(join(process.cwd(), "packages/core/src/worker/session-worker.ts"))});
+const script = path.resolve(${JSON.stringify(join(process.cwd(), "packages/cli/dist/session-worker.js"))});
 const worker = new Worker(script, { execArgv: [] });
 worker.on("error", (err) => { console.error(err); process.exit(1); });
 worker.on("message", (msg) => {

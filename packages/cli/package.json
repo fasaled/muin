@@ -1,6 +1,6 @@
 {
   "name": "@fasaled/muin",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Explore a PDF’s internals from the terminal — objects, streams, page tree, and cross-references — as a navigable graph. Interactive TUI, one-shot commands, and an MCP server for agents.",
   "license": "MIT",
   "type": "module",

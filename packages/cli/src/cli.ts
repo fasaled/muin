@@ -13,6 +13,7 @@ import {
   VERSION,
 } from "@muin/core";
 import { completionHelp, completionScript, normalizeCompletionShell } from "./completion.ts";
+import { startFollow } from "./tui/follow.ts";
 import { startTui } from "./tui/start.ts";
 
 export { UsageError, VERSION };
@@ -24,6 +25,8 @@ Usage:
   muin <file.pdf> <command> [args]     One-shot command (no TUI)
   muin --mcp                           MCP server (agent calls open/close)
   muin --mcp <file.pdf>                MCP server, pre-open this PDF
+  muin --mcp --events <journal>        MCP server, journal every operation to <journal>
+  muin --follow <journal>              Read-only observer of a journaled MCP session
   muin --max-bytes <n> <file.pdf> ...  Cap input size (default: 200 MiB)
   muin help                            Command list
   muin completion bash|zsh|fish|powershell  Print shell completion script
@@ -51,7 +54,8 @@ export type CliArgs =
   | { mode: "completion"; shell?: string }
   | { mode: "tui"; file: string; maxBytes?: number }
   | { mode: "oneshot"; file: string; line: string; maxBytes?: number }
-  | { mode: "mcp"; file?: string; maxBytes?: number };
+  | { mode: "mcp"; file?: string; maxBytes?: number; events?: string }
+  | { mode: "follow"; journal: string };
 
 export function joinCommandLine(tokens: string[]): string {
   return tokens
@@ -69,6 +73,8 @@ export function parseArgs(argv: string[]): CliArgs {
   let help = false;
   let version = false;
   let maxBytes: number | undefined;
+  let events: string | undefined;
+  let follow: string | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -98,6 +104,22 @@ export function parseArgs(argv: string[]): CliArgs {
       maxBytes = n;
       continue;
     }
+    if (a === "--events") {
+      const raw = args[++i];
+      if (raw === undefined) {
+        throw new UsageError("--events requires a journal path");
+      }
+      events = raw;
+      continue;
+    }
+    if (a === "--follow") {
+      const raw = args[++i];
+      if (raw === undefined) {
+        throw new UsageError("--follow requires a journal path");
+      }
+      follow = raw;
+      continue;
+    }
     if (a.startsWith("-") && positional.length === 0) {
       throw new UsageError(`unknown option: ${a}\n${SHORT_USAGE}`);
     }
@@ -107,15 +129,33 @@ export function parseArgs(argv: string[]): CliArgs {
   if (help) return { mode: "help" };
   if (version) return { mode: "version" };
 
+  if (follow !== undefined) {
+    if (mcp) throw new UsageError("--follow cannot be combined with --mcp");
+    if (events !== undefined) throw new UsageError("--follow cannot be combined with --events");
+    if (maxBytes !== undefined) {
+      throw new UsageError("--follow does not take --max-bytes; the journal's open event carries it");
+    }
+    if (positional.length > 0) {
+      throw new UsageError("--follow takes no PDF; the journal's open event provides it");
+    }
+    return { mode: "follow", journal: follow };
+  }
+
   if (mcp) {
     if (positional.length > 1) {
       throw new UsageError(`--mcp does not take a one-shot command\n${SHORT_USAGE}`);
     }
     const file = positional[0];
-    if (file === undefined) {
-      return maxBytes === undefined ? { mode: "mcp" } : { mode: "mcp", maxBytes };
-    }
-    return maxBytes === undefined ? { mode: "mcp", file } : { mode: "mcp", file, maxBytes };
+    const base = {
+      ...(file === undefined ? {} : { file }),
+      ...(maxBytes === undefined ? {} : { maxBytes }),
+      ...(events === undefined ? {} : { events }),
+    };
+    return { mode: "mcp", ...base };
+  }
+
+  if (events !== undefined) {
+    throw new UsageError("--events requires --mcp");
   }
 
   if (positional.length === 1 && positional[0] === "help") {
@@ -184,13 +224,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       if (initialPath !== undefined && !existsSync(initialPath)) {
         throw new NotFoundError(`file not found: ${initialPath}`);
       }
-      await serveMcpStdio(
-        initialPath === undefined
-          ? {}
-          : parsed.maxBytes === undefined
-            ? { initialPath }
-            : { initialPath, maxBytes: parsed.maxBytes },
-      );
+      await serveMcpStdio({
+        ...(initialPath === undefined ? {} : { initialPath }),
+        ...(parsed.maxBytes === undefined ? {} : { maxBytes: parsed.maxBytes }),
+        ...(parsed.events === undefined ? {} : { eventsPath: resolve(parsed.events) }),
+      });
+      return 0;
+    }
+
+    if (parsed.mode === "follow") {
+      await startFollow(resolve(parsed.journal));
       return 0;
     }
 

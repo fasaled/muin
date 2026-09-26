@@ -46,7 +46,7 @@ _muin() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
   local cmds="${COMMANDS}"
-  local flags="--help --version --mcp --max-bytes"
+  local flags="--help --version --mcp --max-bytes --events --follow"
 
   _muin_pdfs() {
     local i
@@ -60,7 +60,7 @@ _muin() {
     done
   }
 
-  if [[ "\$prev" == --max-bytes ]]; then
+  if [[ "\$prev" == --max-bytes || "\$prev" == --events || "\$prev" == --follow ]]; then
     return 0
   fi
 
@@ -140,7 +140,7 @@ function zshScript(): string {
 _muin() {
   local -a cmds flags
   cmds=(ls cd pwd back refs cat stream find tree check export_graph help)
-  flags=(--help --version --mcp --max-bytes)
+  flags=(--help --version --mcp --max-bytes --events --follow)
 
   if (( CURRENT == 2 )); then
     _alternative \\
@@ -160,7 +160,7 @@ _muin() {
     return
   fi
 
-  if [[ \${words[CURRENT-1]} == --max-bytes ]]; then
+  if [[ \${words[CURRENT-1]} == --max-bytes || \${words[CURRENT-1]} == --events || \${words[CURRENT-1]} == --follow ]]; then
     return
   fi
 
@@ -200,6 +200,8 @@ complete -c muin -s h -l help -d 'CLI usage'
 complete -c muin -s v -l version
 complete -c muin -l mcp -d 'MCP server on stdio'
 complete -c muin -l max-bytes -r -d 'Max PDF size in bytes'
+complete -c muin -l events -r -d 'Journal MCP operations to this file'
+complete -c muin -l follow -r -d 'Observe a journaled MCP session'
 complete -c muin -n '__fish_is_first_arg' -a help -d 'List commands'
 complete -c muin -n '__fish_is_first_arg' -a completion -d 'Print completion script'
 complete -c muin -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
@@ -227,7 +229,7 @@ Register-ArgumentCompleter -Native -CommandName muin -ScriptBlock {
     param(\$wordToComplete, \$commandAst, \$cursorPosition)
 
     \$cmds = @('ls','cd','pwd','back','refs','cat','stream','find','tree','check','export_graph','help')
-    \$flags = @('--help','--version','--mcp','--max-bytes')
+    \$flags = @('--help','--version','--mcp','--max-bytes','--events','--follow')
     \$shells = @('bash','zsh','fish','powershell','pwsh')
 
     \$tokens = @(\$commandAst.CommandElements | ForEach-Object { \$_.Extent.Text })

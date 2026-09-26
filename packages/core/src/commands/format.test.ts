@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { formatBytes, formatSnapshot, sanitizeQpdfMessage } from "./format.ts";
+import { formatBytes, formatCommand, formatSnapshot, sanitizeQpdfMessage } from "./format.ts";
+import { parseCommand, type ParsedCommand } from "./parse.ts";
 
 describe("formatSnapshot", () => {
   const ref = { objectNumber: 99, generation: 0 };
@@ -46,6 +47,55 @@ describe("formatBytes", () => {
     expect(text).toMatch(/\[\+\d+ more bytes\]/);
     const hexLines = text.split("\n").filter((l) => /^[0-9a-f]{8}\s/.test(l));
     expect(hexLines.length).toBeLessThan(20_000 / 16);
+  });
+});
+
+describe("formatCommand", () => {
+  const cases: ParsedCommand[] = [
+    { name: "ls" },
+    { name: "ls", ref: "3 0 R" },
+    { name: "cd", target: "3 0 R" },
+    { name: "cd", target: "/Pages" },
+    { name: "pwd" },
+    { name: "back" },
+    { name: "refs", ref: "4 0 R" },
+    { name: "neighbors" },
+    { name: "cat", ref: "5 0 R" },
+    { name: "stream", mode: "raw" },
+    { name: "stream", ref: "5 0 R", mode: "decoded" },
+    { name: "find", type: "Stream" },
+    { name: "find", type: "Stream", where: "/Length > 1000" },
+    { name: "find", type: "Font", where: "/BaseFont == /Arial AND /Length != 0" },
+    { name: "tree" },
+    { name: "tree", ref: "3 0 R", depth: 4 },
+    { name: "check" },
+    { name: "export_graph" },
+    { name: "export_graph", from: "1 0 R", depth: 3 },
+    { name: "export_graph", find: "/Type == /Page" },
+    { name: "help" },
+    { name: "help", command: "find" },
+    { name: "quit" },
+  ];
+
+  test("round-trips through parseCommand", () => {
+    for (const cmd of cases) {
+      expect(parseCommand(formatCommand(cmd))).toEqual(cmd);
+    }
+  });
+
+  test("quotes values with whitespace or quotes", () => {
+    expect(formatCommand({ name: "find", type: "Stream", where: "/Length > 5" })).toBe(
+      'find --type Stream --where "/Length > 5"',
+    );
+    expect(formatCommand({ name: "cd", target: "3 0 R" })).toBe('cd "3 0 R"');
+    expect(formatCommand({ name: "find", type: "A", where: `has "double" quotes` })).toBe(
+      `find --type A --where 'has "double" quotes'`,
+    );
+  });
+
+  test("throws for a token containing both quote kinds (no escape syntax exists)", () => {
+    expect(() => formatCommand({ name: "find", type: "A", where: `both "and' quotes` })).toThrow();
+    expect(() => formatCommand({ name: "cd", target: "" })).toThrow();
   });
 });
 

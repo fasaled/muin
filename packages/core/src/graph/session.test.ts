@@ -19,7 +19,7 @@ describe("session", () => {
 
   test("cd by key and back", () => {
     const s = cd(minimalSession(), "/Pages");
-    expect(s.cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(s.cwd).toEqual({ objectNumber: 2, generation: 0 });
     expect(s.path).toEqual(["/Root", "/Pages"]);
     const prev = back(s);
     expect(prev.cwd).toEqual({ objectNumber: 1, generation: 0 });
@@ -28,17 +28,17 @@ describe("session", () => {
   });
 
   test("cd by ref replaces the path", () => {
-    const s = cd(minimalSession(), "4 0 R");
-    expect(s.cwd).toEqual({ objectNumber: 4, generation: 0 });
-    expect(s.path).toEqual(["4 0 R"]);
+    const s = cd(minimalSession(), "3 0 R");
+    expect(s.cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(s.path).toEqual(["3 0 R"]);
   });
 
   test("back after cd by ref restores the prior path, not just cwd", () => {
     const start = cd(minimalSession(), "/Pages");
-    const jumped = cd(start, "4 0 R");
-    expect(jumped.path).toEqual(["4 0 R"]);
+    const jumped = cd(start, "3 0 R");
+    expect(jumped.path).toEqual(["3 0 R"]);
     const prev = back(jumped);
-    expect(prev.cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(prev.cwd).toEqual({ objectNumber: 2, generation: 0 });
     expect(prev.path).toEqual(["/Root", "/Pages"]);
   });
 
@@ -48,7 +48,7 @@ describe("session", () => {
       ref: { objectNumber: 6, generation: 0 },
       value: {
         kind: "array",
-        items: [{ kind: "ref", ref: { objectNumber: 4, generation: 0 } }],
+        items: [{ kind: "ref", ref: { objectNumber: 3, generation: 0 } }],
       },
     };
     const catalog = structure.objects["1 0 R"];
@@ -58,7 +58,7 @@ describe("session", () => {
     const s = openSession("minimal.pdf", structure);
     const arr = cd(s, "/Arr");
     const page = cd(arr, "0");
-    expect(page.cwd).toEqual({ objectNumber: 4, generation: 0 });
+    expect(page.cwd).toEqual({ objectNumber: 3, generation: 0 });
     expect(page.path.at(-1)).toBe("[0]");
   });
 
@@ -70,7 +70,7 @@ describe("session", () => {
 
   test("outgoing and incoming refs", () => {
     const s = cd(minimalSession(), "/Pages");
-    expect(outgoingRefs(s).map((r) => r.objectNumber)).toContain(4);
+    expect(outgoingRefs(s).map((r) => r.objectNumber)).toContain(3);
     expect(incoming(s).some((r) => r.objectNumber === 1)).toBe(true);
   });
 });

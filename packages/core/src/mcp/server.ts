@@ -6,6 +6,8 @@ import { createSession, type CommandResult, type MuinSession, type SessionOption
 import type { ParsedCommand } from "../commands/parse.ts";
 import { helpText } from "../commands/help.ts";
 import { UsageError } from "../errors.ts";
+import { createJournal, rotateJournal, type Journal } from "../journal/journal.ts";
+import { withJournal } from "../journal/journaling.ts";
 import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
 import { VERSION } from "../version.ts";
 
@@ -31,12 +33,37 @@ function textResult(text: string, isError = false) {
 export type McpServerOptions = {
   openSession?: (path: string, options?: SessionOptions) => Promise<MuinSession>;
   session?: MuinSession;
+  /** Explicit journal (tests, embedders): recorded as-is, never rotated, never closed. */
+  journal?: Journal;
+  /** File journal: created here, rotated on every successful open, closed with the server. */
+  eventsPath?: string;
+  /** Pre-opened session's open event, recorded (after rotation) like a tool open. */
+  initialOpen?: { path: string; maxBytes?: number };
 };
 
 export function createMcpServer(options: McpServerOptions = {}): McpServer {
+  let journal: Journal | undefined =
+    options.journal ?? (options.eventsPath === undefined ? undefined : tryCreateJournal(options.eventsPath));
   const opener = options.openSession ?? createSession;
-  let session: MuinSession | undefined = options.session;
+  const wrap = (s: MuinSession): MuinSession => (journal ? withJournal(s, journal) : s);
+  let session: MuinSession | undefined = options.session === undefined ? undefined : wrap(options.session);
   const server = new McpServer({ name: "muin", version: VERSION });
+
+  // A new opened file starts a new journal: close the old handle, rotate the file
+  // aside, and open fresh — so one journal file always holds a single PDF session.
+  const rotateForOpen = (): void => {
+    if (options.eventsPath === undefined) return;
+    journal?.close();
+    tryRotateJournal(options.eventsPath);
+    journal = tryCreateJournal(options.eventsPath);
+  };
+  const recordOpen = (path: string, maxBytes?: number): void => {
+    journal?.record({ type: "open", path, ...(maxBytes === undefined ? {} : { maxBytes }) });
+  };
+  if (options.initialOpen !== undefined && session !== undefined) {
+    rotateForOpen();
+    recordOpen(options.initialOpen.path, options.initialOpen.maxBytes);
+  }
 
   const requireSession = (): MuinSession => {
     if (!session) {
@@ -54,8 +81,12 @@ export function createMcpServer(options: McpServerOptions = {}): McpServer {
       session?.close();
       session = undefined;
       const opts: SessionOptions = args.maxBytes === undefined ? {} : { maxBytes: args.maxBytes };
-      session = await opener(filePath, opts);
-      const pwd = await session.run("pwd");
+      const opened = await opener(filePath, opts);
+      rotateForOpen();
+      session = wrap(opened);
+      recordOpen(filePath, args.maxBytes);
+      // Server-side sugar for the tool response, not an agent operation: run un-journaled.
+      const pwd = await opened.run("pwd");
       return textResult(`opened ${session.filePath}\n${asText(pwd)}`);
     },
   );
@@ -156,6 +187,14 @@ export function createMcpServer(options: McpServerOptions = {}): McpServer {
     return textResult(`${helpText(cmd)}\n${cmd ? "" : extra}`.trim());
   });
 
+  if (options.eventsPath !== undefined) {
+    const prevClose = server.server.onclose;
+    server.server.onclose = () => {
+      prevClose?.();
+      journal?.close();
+    };
+  }
+
   return server;
 }
 
@@ -167,13 +206,24 @@ export type ServeMcpOptions = McpServerOptions & {
 export async function serveMcpStdio(options: ServeMcpOptions = {}): Promise<void> {
   const opener = options.openSession ?? createSession;
   let session = options.session;
+  let initialOpen: { path: string; maxBytes?: number } | undefined;
   if (options.initialPath) {
+    const initialPath = resolve(options.initialPath);
     session = await opener(
-      resolve(options.initialPath),
+      initialPath,
       options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes },
     );
+    initialOpen = {
+      path: initialPath,
+      ...(options.maxBytes === undefined ? {} : { maxBytes: options.maxBytes }),
+    };
   }
-  const server = createMcpServer(session === undefined ? { openSession: opener } : { openSession: opener, session });
+  const server = createMcpServer({
+    openSession: opener,
+    ...(session === undefined ? {} : { session }),
+    ...(options.eventsPath === undefined ? {} : { eventsPath: options.eventsPath }),
+    ...(initialOpen === undefined ? {} : { initialOpen }),
+  });
   const transport = new StdioServerTransport();
   const closed = new Promise<void>((resolve) => {
     const prev = server.server.onclose;
@@ -184,4 +234,26 @@ export async function serveMcpStdio(options: ServeMcpOptions = {}): Promise<void
   });
   await server.connect(transport);
   await closed;
+}
+
+/** Rotation is best-effort like the journal itself: a stale journal beats no server. */
+function tryRotateJournal(path: string): void {
+  try {
+    const backup = rotateJournal(path);
+    if (backup !== undefined) {
+      process.stderr.write(`muin: rotated previous journal to ${backup}\n`);
+    }
+  } catch (err) {
+    process.stderr.write(`muin: cannot rotate journal ${path}: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+}
+
+/** Observation is best-effort: an unwritable journal must not stop the agent's server. */
+function tryCreateJournal(path: string): Journal | undefined {
+  try {
+    return createJournal(path);
+  } catch (err) {
+    process.stderr.write(`muin: cannot write journal ${path}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return undefined;
+  }
 }

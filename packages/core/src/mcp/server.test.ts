@@ -1,9 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { openSession } from "../graph/session.ts";
+import { readJournal } from "../journal/reader.ts";
 import { MCP_STREAM_MAX_BYTES } from "../limits.ts";
 import { bindSession } from "../session.ts";
-import { fakeAdapter, fixturePath, minimalSession } from "../test/helpers.ts";
+import { addStreamObject, fakeAdapter, fixturePath, loadMinimalStructure, minimalSession } from "../test/helpers.ts";
 import { createMcpServer } from "./server.ts";
 
 async function connect(opts?: Parameters<typeof createMcpServer>[0]) {
@@ -93,12 +98,14 @@ describe("MCP server", () => {
 
   test("stream tool caps oversized bytes instead of dumping them all as base64", async () => {
     const big = new Uint8Array(MCP_STREAM_MAX_BYTES + 10);
+    const structure = loadMinimalStructure();
+    addStreamObject(structure);
     const { client, server } = await connect({
       openSession: async () =>
-        bindSession(minimalSession(), fakeAdapter({ readStream: async () => big })),
+        bindSession(openSession("minimal.pdf", structure), fakeAdapter({ readStream: async () => big })),
     });
     await client.callTool({ name: "open", arguments: { path: fixturePath("pdf", "minimal.pdf") } });
-    const result = await client.callTool({ name: "stream", arguments: { ref: "5 0 R" } });
+    const result = await client.callTool({ name: "stream", arguments: { ref: "4 0 R" } });
     const text = JSON.stringify(result.content);
     expect(text).toContain("truncated");
     expect(text).toContain(String(big.byteLength));
@@ -112,5 +119,55 @@ describe("MCP server", () => {
     expect(JSON.stringify(once.content)).toContain("no PDF was open");
     await client.close();
     await server.close();
+  });
+
+  test("journals every agent operation, but not the open tool's internal pwd", async () => {
+    const events: { type: string; line?: string }[] = [];
+    const journal = {
+      record: (input: { type: string; line?: string }) => events.push(input),
+      close: () => {},
+    };
+    const { client, server } = await connect({ openSession: fakeOpen(), journal });
+    await client.callTool({ name: "open", arguments: { path: fixturePath("pdf", "minimal.pdf"), maxBytes: 1000 } });
+    await client.callTool({ name: "cd", arguments: { target: "/Pages" } });
+    await client.callTool({ name: "pwd", arguments: {} });
+    await client.callTool({ name: "close", arguments: {} });
+
+    expect(events.map((e) => (e.type === "cmd" ? `cmd:${e.line}` : e.type))).toEqual([
+      "open",
+      "cmd:cd /Pages",
+      "cmd:pwd",
+      "close",
+    ]);
+    await client.close();
+    await server.close();
+  });
+
+  test("rotates the journal on every successful open when eventsPath is set", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "muin-rotate-test-"));
+    try {
+      const journal = join(dir, "live.jsonl");
+      const { client, server } = await connect({ openSession: fakeOpen(), eventsPath: journal });
+      await client.callTool({ name: "open", arguments: { path: "/tmp/a.pdf" } });
+      await client.callTool({ name: "cd", arguments: { target: "/Pages" } });
+      await client.callTool({ name: "open", arguments: { path: "/tmp/b.pdf" } });
+      await client.callTool({ name: "pwd", arguments: {} });
+
+      const live = readJournal(journal).map((e) => (e.type === "cmd" ? `cmd:${e.line}` : e.type));
+      expect(live).toEqual(["open", "cmd:pwd"]);
+
+      const backups = readdirSync(dir).filter((f) => f !== "live.jsonl");
+      expect(backups).toHaveLength(1);
+      expect(backups[0]).toMatch(/^live-\d{8}-\d{6}\.jsonl$/);
+      const old = readJournal(join(dir, backups[0] as string)).map((e) =>
+        e.type === "cmd" ? `cmd:${e.line}` : e.type,
+      );
+      expect(old).toEqual(["open", "cmd:cd /Pages", "close"]);
+
+      await client.close();
+      await server.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

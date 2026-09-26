@@ -10,20 +10,35 @@ const minimal = JSON.parse(readFileSync(fixturePath("json", "minimal.json"), "ut
 describe("parseQpdfJson", () => {
   test("parses the minimal fixture", () => {
     const doc = parseQpdfJson(minimal);
-    expect(doc.pdfVersion).toBe("1.3");
+    expect(doc.pdfVersion).toBe("1.1");
+    expect(Object.keys(doc.objects).sort()).toEqual(["1 0 R", "2 0 R", "3 0 R"]);
     expect(doc.objects["1 0 R"]?.value.kind).toBe("dict");
     const catalog = doc.objects["1 0 R"]?.value;
     expect(catalog && nameEquals(catalog.kind === "dict" ? dictGet(catalog, "/Type") : undefined, "Catalog")).toBe(
       true,
     );
-    const stream = doc.objects["5 0 R"]?.value;
+    const pages = doc.objects["2 0 R"]?.value;
+    expect(pages && nameEquals(pages.kind === "dict" ? dictGet(pages, "/Type") : undefined, "Pages")).toBe(true);
+    const root = dictGet(doc.trailer, "/Root");
+    expect(root?.kind).toBe("ref");
+  });
+
+  test("parses stream objects", () => {
+    const doc = parseQpdfJson({
+      qpdf: [
+        { jsonversion: 2 },
+        {
+          "obj:4 0 R": { stream: { dict: { "/Length": 10, "/Filter": "/FlateDecode" }, data: null } },
+          trailer: { value: { "/Root": "1 0 R" } },
+        },
+      ],
+    });
+    const stream = doc.objects["4 0 R"]?.value;
     expect(stream && isStream(stream)).toBe(true);
     if (stream && isStream(stream)) {
       expect(stream.length).toBe(10);
       expect(nameEquals(dictGet(stream.dict, "/Filter"), "FlateDecode")).toBe(true);
     }
-    const root = dictGet(doc.trailer, "/Root");
-    expect(root?.kind).toBe("ref");
   });
 
   test("rejects encrypted trailers", () => {

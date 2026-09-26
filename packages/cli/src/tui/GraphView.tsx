@@ -9,7 +9,8 @@ type Props = {
   neighbors: Neighbors | null;
   focused: boolean;
   busy: boolean;
-  onNavigate: (line: string) => void;
+  /** Omitted in read-only contexts (e.g. `muin --follow`): Enter then does nothing. */
+  onNavigate?: (line: string) => void;
 };
 
 /** The kind span: a real "/Type" name renders plain, muin's own summary is bracketed and dim. */
@@ -120,7 +121,7 @@ export function GraphView({ neighbors, focused, busy, onNavigate }: Props) {
       }
       if (key.return) {
         const entry = lists[column][index];
-        if (entry && !entry.missing) onNavigate(`cd ${entry.ref}`);
+        if (entry && !entry.missing && onNavigate) onNavigate(`cd ${entry.ref}`);
         return;
       }
     },
@@ -138,7 +139,9 @@ export function GraphView({ neighbors, focused, busy, onNavigate }: Props) {
   const empty = neighbors.incoming.entries.length === 0 && neighbors.outgoing.entries.length === 0;
 
   return (
-    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1}>
+    // Natural height, never compressed: neighbor lists are already capped, and the
+    // object pane below absorbs the remainder (see chrome.tsx).
+    <Box flexDirection="column" flexGrow={1} flexShrink={0} borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1}>
       {empty ? (
         <Text dimColor>no references here — try cd or find</Text>
       ) : (

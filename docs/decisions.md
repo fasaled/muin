@@ -4,7 +4,7 @@ Each entry: context, decision, consequences.
 
 ## D1 — Scoped npm name `@fasaled/muin`
 
-**Context:** Unscoped `muin` is unused on the registry but npm’s typosquatting filter rejects it as too similar to `must`, `mri`, `cuid`, `uid`, `uuid`, and `bun`.
+**Context:** The CLI is published under the `@fasaled` scope; the installed binary is still `muin`.
 
 **Decision:** Publish `@fasaled/muin`. Keep the binary name `muin`.
 
@@ -148,7 +148,7 @@ panel. Full text preserved in git history
 
 **Decision:** `render(<App/>, { alternateScreen: true })` — Ink 7's built-in full-screen mode, the same mechanism `vim`/`htop`/`lazygit` use. The alternate screen has no scrollback, so any content taller than the terminal would otherwise be permanently unreachable; the `Overlay` component compensates by measuring its own height (`measureElement`) and paginating with `↑`/`↓`/`PageUp`/`PageDown` instead of relying on the terminal.
 
-**Consequences:** The terminal's prior contents return unchanged on exit, and the app now has a real screen to lay out (see `docs/design.md`'s "TUI UI model": centered, width-capped, vertically distributed via `useStdout`). Every long-output surface (currently only `Overlay`) is responsible for its own scrolling; a future pane that can grow unbounded needs the same treatment, not a plain `<Text>`.
+**Consequences:** The terminal's prior contents return unchanged on exit, and the app now has a real screen to lay out (see `docs/design.md`'s "TUI UI model": centered, width-capped, vertically distributed via `useStdout`). Every long-output surface (currently only `Overlay`) is responsible for its own scrolling; a future pane that can grow unbounded needs the same treatment, not a plain `<Text>`. Flex rows are contractual, not emergent: fixed chrome (header, prompt) and the graph pane never yield (`flexShrink={0}`); scrollable panes absorb whatever the graph leaves (`flexShrink={1}`, `minHeight={0}`) and page to the measured remainder. Letting the measure/slice loop compress the header produced overlapping rows once (the object pane with a 40-key dict ate the header's first line).
 
 ## D20 — VS Code extension removed
 
@@ -156,4 +156,20 @@ panel. Full text preserved in git history
 
 **Decision:** Drop `packages/vscode` and the VS Code-only bits of `@muin/core` (the MCP `focused` tool and `MUIN_FOCUSED_PDF_FILE` hint file; `workerScript`/`workerProcess` remain as generally useful session options). Effort concentrates on the CLI's TUI and MCP.
 
-**Consequences:** Two clients remain: TUI/REPL and MCP, both via `@fasaled/muin`. D12–D13 above are retired stubs; D11, D15, and D16 were edited to remove extension scope. The full extension design is preserved in git history, not in this document.
+**Consequences:** Two clients remained at the time: TUI/REPL and MCP, both via `@fasaled/muin` (the read-only follower joined later, D21). D12–D13 above are retired stubs; D11, D15, and D16 were edited to remove extension scope. The full extension design is preserved in git history, not in this document.
+
+## D21 — Read-only observation via an append-only journal
+
+**Context:** Watching what an agent does through the MCP server cannot mean a second MCP client: stdio is 1:1, and HTTP MCP is a non-goal. The observation channel must be one-directional and must not slow the agent or let the observer interfere.
+
+**Decision:** `muin --mcp --events <path>` appends one JSONL event per agent operation (`packages/core/src/journal/`). Observation is layered: core exposes the journal writer/reader plus a `withJournal` session decorator (the single instrumentation point — hosts record lifecycle `open`/`close` themselves). `muin --follow <path>` runs a separate TUI component (`FollowApp`, no prompt, no history) over its own mirror session: it seeks by `cd <catalog-ref>` plus forward replay of `ok` nav ops (no qpdf re-parse, LRU-cached), flags cwd divergence, and auto-plays on an observation clock (default 1 op/s, 100 ms–5 s) that ignores real event timestamps. The follower reuses the TUI's panes, overlay keys, and exit keys; the header badge is the single always-visible mode indicator (green play / yellow paused / dim waiting / red diverged-or-error, red being otherwise unused).
+
+**Consequences:** One writer per journal file (concurrent writers would interleave lines); journal previews are capped (`JOURNAL_PREVIEW_MAX_CHARS`) so large results don't bloat the file; keyboard navigation of the graph is display-only. Future clients that want recording (e.g. the TUI recording itself) reuse `withJournal` without touching the MCP server.
+
+## D22 — Journal rotation per opened PDF
+
+**Context:** The journal appends forever (D21): every new agent session's operations concatenate after the previous session's, and the file grows without bound. The follower cannot tell sessions apart. Rotating on server start was considered, but start does not mean a new session — handshakes and `mcp list` probes spawn short-lived servers that must not rotate, and only `open` starts actual work.
+
+**Decision:** Every successful `open` (tool call or pre-opened file) rotates a non-empty journal aside to a timestamped backup in the same directory (`live-20260926-213500.jsonl`, counter suffix on collision) before recording — one journal file per opened PDF, regardless of server restarts. The previous session's `close` (if any) is recorded to the old file before rotating, so it stays attributed correctly. Rotation and recording stay best-effort (a stale journal beats no server). The tail detects the replacement (size below the read offset) and reports it, so the follower drops the previous timeline and waits for the new session instead of concatenating. Backups are never auto-deleted; they stay replayable via `muin --follow <backup>`.
+
+**Consequences:** An MCP restart mid-session only splits the journal once the agent re-opens (unavoidable — a fresh process holds no session); manual truncation behaves like a rotation. Writers re-anchor to the path before each record (dev/ino check), so a live writer survives any rotation and follows the fresh file instead of the renamed inode — and a deleted journal is recreated on the next record. Old sessions remain inspectable as long as their backups are kept.

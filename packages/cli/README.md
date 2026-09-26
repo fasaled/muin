@@ -15,6 +15,8 @@ muin document.pdf ls 3 0 R
 muin document.pdf find --type Stream --where "/Filter == /FlateDecode"
 muin --mcp
 muin --mcp document.pdf          # optional: pre-open this file
+muin --mcp --events live.jsonl  # journal every operation; watch it with `muin --follow live.jsonl`
+muin --follow live.jsonl        # read-only observer of a journaled agent session
 muin --max-bytes 10485760 document.pdf
 muin help
 muin --help
@@ -22,7 +24,7 @@ muin --help
 
 Requires Node.js 18+. Encrypted PDFs are not supported.
 
-The unscoped name `muin` is blocked by npm’s similarity filter. The package is `@fasaled/muin`; the command is still `muin`.
+The package is `@fasaled/muin`; the command is still `muin`.
 
 ## TUI
 
@@ -31,7 +33,7 @@ The unscoped name `muin` is blocked by npm’s similarity filter. The package is
 - `Tab` completes and cycles command, flag, and reference candidates. `Shift+Tab` changes focus between the prompt, graph, and object.
 - With the graph focused, `←`/`→` pick a pane, `↑`/`↓` pick a neighbor, `Enter` is `cd <ref>`.
 - Any other command (`find`, `tree`, `check`, `help`, `history`, `cat`, `stream`, …) opens a dismissible overlay. If it is taller than the screen, `↑`/`↓`/`PageUp`/`PageDown` scroll it; `Esc` closes it.
-- The command panel shows the initial command list, file, cwd, active operation, and queue. History is persistent in `~/.config/muin/history.json`; commands submitted while busy are queued and run in order.
+- The command panel shows the initial command list, file, cwd, active operation, queue, and last executed command (`last:`). History is persistent in `~/.config/muin/history.json`; commands submitted while busy are queued and run in order.
 
 If stdin is not a TTY, Muin uses a line-oriented REPL instead of the TUI.
 
@@ -40,6 +42,12 @@ One-shot commands (`muin file.pdf check`) open the file, run one verb, and exit.
 ## MCP
 
 `muin --mcp` is a long-lived server. The agent calls `open` with a PDF path, then `ls` / `cd` / `find` / … on that session, then `close`. `muin --mcp document.pdf` pre-opens that file.
+
+## Observing an agent session
+
+`muin --mcp --events live.jsonl` appends one JSON line per operation (tool, args, outcome, cwd snapshot, truncated preview) to the journal file — 0600, best-effort, never in the agent's way. Configure it once in the agent's MCP server args; the agent itself never sees it. Every successful `open` rotates a non-empty journal aside (`live-<timestamp>.jsonl` next to it) and starts fresh, so each opened PDF gets its own file; restarts and probes without an `open` never rotate. The follower detects the rotation and restarts its timeline. Backups are kept — delete them when done, or replay one with `muin --follow <backup>`.
+
+`muin --follow live.jsonl` opens a read-only TUI on that journal: it opens its own session on the PDF and mirrors the agent's navigation, showing each operation as a scrubbable timeline. There is no prompt and no history — commands cannot be typed. `←`/`→` step through operations, `Space` auto-plays at a human pace (default 1 op/s, `+`/`-` adjust between 100 ms and 5 s), `g`/`G` jump to the first/last, overlay scrolling and `Esc`/`Ctrl+C` behave like the TUI. The header badge always shows the mode: `▶ play` (green), `■ paused` (yellow), `… waiting` (dim), `! diverged` (red, mirror disagrees with the journal). Without a TTY, `--follow` prints operations line-by-line instead.
 
 ## Shell completion
 

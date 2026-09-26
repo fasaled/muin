@@ -10,11 +10,11 @@ import {
   type CompletionResult,
   type MuinSession,
   type Neighbors,
-  type SessionSnapshot,
 } from "@muin/core";
 import { GraphView } from "./GraphView.tsx";
+import { baseName, Header, ObjectView, Overlay, type OverlayState } from "./chrome.tsx";
 import { loadHistory, saveHistory } from "./history.ts";
-import { useScrollableText, useViewportSize } from "./scroll.ts";
+import { useViewportSize } from "./scroll.ts";
 
 const EXTRA_COMMANDS = ["history"];
 const MAX_APP_WIDTH = 100;
@@ -25,7 +25,6 @@ type Props = {
 };
 
 type Focus = (typeof FOCUS_ORDER)[number];
-type OverlayState = { title: string; body: string };
 
 // Overlay and the object pane page through their content, so this is a memory sanity cap, not a screen-space one.
 const RESULT_CAP = TEXT_PREVIEW_MAX_CHARS;
@@ -47,79 +46,6 @@ export function renderResult(result: CommandResult): string {
   }
   if (text.length <= RESULT_CAP) return text;
   return `${text.slice(0, RESULT_CAP)}\n[+${text.length - RESULT_CAP} more chars]`;
-}
-
-function baseName(path: string): string {
-  return path.replace(/^.*[/\\]/, "") || path;
-}
-
-const Header = memo(function Header({ file, snap }: { file: string; snap: SessionSnapshot }) {
-  return (
-    <Box flexDirection="column">
-      <Box>
-        <Text color="cyan" bold>
-          muin
-        </Text>
-        <Text dimColor>  {file}</Text>
-      </Box>
-      <Text>{formatSnapshot(snap.cwd, snap.path)}</Text>
-      <Box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderColor="gray" />
-    </Box>
-  );
-});
-
-function ObjectView({ text, focused, busy }: { text: string | null; focused: boolean; busy: boolean }) {
-  const { ref, visible, clamped, total, hasMore } = useScrollableText(text ?? "", focused && !busy);
-  return (
-    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1}>
-      <Text>
-        <Text dimColor>object</Text>
-        {hasMore ? (
-          <Text dimColor>
-            {"   ↑↓/PgUp/PgDn scroll   "}
-            {clamped + 1}-{Math.min(clamped + visible.length, total)}/{total}
-          </Text>
-        ) : null}
-      </Text>
-      {text === null ? (
-        <Text dimColor>…</Text>
-      ) : (
-        <Box ref={ref} flexDirection="column" flexGrow={1} overflow="hidden">
-          {visible.map((line, i) => (
-            <Text key={clamped + i} wrap="truncate-end">
-              {line.length > 0 ? line : " "}
-            </Text>
-          ))}
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function Overlay({ title, body, busy, scrollRequest }: OverlayState & { busy: boolean; scrollRequest: { id: number; direction: "up" | "down" | "pageUp" | "pageDown" } | undefined }) {
-  const { ref, visible, clamped, total, hasMore } = useScrollableText(body, !busy, title === "activity", scrollRequest);
-
-  return (
-    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Text>
-        <Text bold>{title}</Text>
-        <Text dimColor>{hasMore ? "   ↑↓/PgUp/PgDn scroll   Esc closes" : "   Esc closes"}</Text>
-        {hasMore ? (
-          <Text dimColor>
-            {"   "}
-            {clamped + 1}-{Math.min(clamped + visible.length, total)}/{total}
-          </Text>
-        ) : null}
-      </Text>
-      <Box ref={ref} flexDirection="column" flexGrow={1} overflow="hidden">
-        {visible.map((line, i) => (
-          <Text key={clamped + i} wrap="truncate-end">
-            {line.length > 0 ? line : " "}
-          </Text>
-        ))}
-      </Box>
-    </Box>
-  );
 }
 
 const CompletionHint = memo(function CompletionHint({ items, index }: { items: string[]; index: number }) {
@@ -163,6 +89,7 @@ function Prompt({
   hint,
   file,
   location,
+  lastLine,
   queueLabel,
   onPush,
   onToggleFocus,
@@ -177,6 +104,7 @@ function Prompt({
   hint: string;
   file: string;
   location: string;
+  lastLine: string | null;
   queueLabel: string | null;
   onPush: (line: string) => void;
   onToggleFocus: () => void;
@@ -377,7 +305,8 @@ function Prompt({
   const after = draft.slice(cursor);
 
   return (
-    <Box borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1} flexDirection="column" height={9}>
+    // Fixed height: the prompt never yields rows to the panes above it.
+    <Box borderStyle="round" borderColor={focused ? "cyan" : "gray"} paddingX={1} flexDirection="column" height={10} flexShrink={0}>
       <Box justifyContent="space-between">
         <Text color="cyan" bold>
           COMMAND
@@ -393,6 +322,7 @@ function Prompt({
         <Text>active: {queueLabel?.split(" · ")[0] ?? "idle"}</Text>
       )}
       <Text color="yellow">queue: {queueLabel?.match(/· (.+)$/)?.[1] ?? "empty"}</Text>
+      <Text dimColor wrap="truncate-end">last: {lastLine ?? "(none)"}</Text>
       <Box>
         <Text>{busy ? "…" : "›"} </Text>
         {focused ? (
@@ -424,6 +354,7 @@ export function App({ session }: Props) {
   const activityRef = useRef<string[]>([]);
   const [history, setHistory] = useState<string[]>(loadHistory);
   const [commandQueue, setCommandQueue] = useState<string[]>([]);
+  const [lastLine, setLastLine] = useState<string | null>(null);
   const [activityScrollRequest, setActivityScrollRequest] = useState<{ id: number; direction: "up" | "down" | "pageUp" | "pageDown" }>();
 
   const refreshNeighbors = useCallback(async () => {
@@ -452,6 +383,7 @@ export function App({ session }: Props) {
   const execLine = useCallback(
     (line: string) => {
       const trimmed = line.trim();
+      setLastLine(trimmed);
       const appendActivity = (body: string) => {
         activityRef.current = [...activityRef.current, `$ ${line}\n${body}`].slice(-100);
         setOverlay({ title: "activity", body: activityRef.current.join("\n\n") });
@@ -578,6 +510,7 @@ export function App({ session }: Props) {
           hint={commandHint}
           file={baseName(session.filePath)}
           location={formatSnapshot(snap.cwd, snap.path)}
+          lastLine={lastLine}
           queueLabel={
             busy || commandQueue.length > 0
               ? `${busy ? "running" : "ready"}${commandQueue.length > 0 ? ` · ${commandQueue.length} queued` : ""}`

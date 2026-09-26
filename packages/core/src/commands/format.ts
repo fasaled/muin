@@ -1,6 +1,8 @@
+import { UsageError } from "../errors.ts";
 import type { Session } from "../graph/session.ts";
 import { BINARY_PREVIEW_MAX_BYTES, TEXT_PREVIEW_MAX_CHARS } from "../limits.ts";
 import { formatRef, isArray, isDict, isStream, type PdfRef, type PdfValue } from "../pdf/model.ts";
+import type { ParsedCommand } from "./parse.ts";
 
 export function formatSnapshot(cwd: { objectNumber: number; generation: number }, path: string[]): string {
   const ref = formatRef(cwd);
@@ -139,6 +141,60 @@ function hexdump(bytes: Uint8Array): string {
     lines.push(`${i.toString(16).padStart(8, "0")}  ${hex.padEnd(47)}  ${ascii}`);
   }
   return lines.join("\n");
+}
+
+/**
+ * Inverse of parseCommand, for display (journal lines, UI labels). The tokenizer has no
+ * escape syntax, so a value containing both quote kinds (or an empty one) cannot be
+ * represented — formatCommand throws UsageError there and callers fall back to cmd.name.
+ */
+export function formatCommand(cmd: ParsedCommand): string {
+  switch (cmd.name) {
+    case "ls":
+    case "refs":
+    case "cat":
+    case "neighbors":
+      return cmd.ref === undefined ? cmd.name : `${cmd.name} ${quoteToken(cmd.ref)}`;
+    case "cd":
+      return `cd ${quoteToken(cmd.target)}`;
+    case "pwd":
+    case "back":
+    case "check":
+    case "quit":
+      return cmd.name;
+    case "help":
+      return cmd.command === undefined ? "help" : `help ${quoteToken(cmd.command)}`;
+    case "stream": {
+      const parts = ["stream", `--${cmd.mode}`];
+      if (cmd.ref !== undefined) parts.push(quoteToken(cmd.ref));
+      return parts.join(" ");
+    }
+    case "find": {
+      const parts = ["find", "--type", quoteToken(cmd.type)];
+      if (cmd.where !== undefined) parts.push("--where", quoteToken(cmd.where));
+      return parts.join(" ");
+    }
+    case "tree": {
+      const parts = ["tree"];
+      if (cmd.depth !== undefined) parts.push("--depth", String(cmd.depth));
+      if (cmd.ref !== undefined) parts.push(quoteToken(cmd.ref));
+      return parts.join(" ");
+    }
+    case "export_graph": {
+      const parts = ["export_graph"];
+      if (cmd.from !== undefined) parts.push("--from", quoteToken(cmd.from));
+      if (cmd.depth !== undefined) parts.push("--depth", String(cmd.depth));
+      if (cmd.find !== undefined) parts.push("--find", quoteToken(cmd.find));
+      return parts.join(" ");
+    }
+  }
+}
+
+function quoteToken(value: string): string {
+  if (value.length > 0 && !/[\s"']/.test(value)) return value;
+  if (value.length > 0 && !value.includes('"')) return `"${value}"`;
+  if (value.length > 0 && !value.includes("'")) return `'${value}'`;
+  throw new UsageError(`token cannot be quoted for a command line: ${JSON.stringify(value)}`);
 }
 
 export function sanitizeQpdfMessage(message: string, filePath: string): string {

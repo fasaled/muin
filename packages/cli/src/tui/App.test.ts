@@ -58,7 +58,7 @@ describe("App", () => {
     await Bun.sleep(50);
     const frame = instance.lastFrame() ?? "";
     expect(frame).toContain("outgoing");
-    expect(frame).toContain("3 0 R");
+    expect(frame).toContain("2 0 R");
     instance.unmount();
   });
 
@@ -103,7 +103,7 @@ describe("App", () => {
     await Bun.sleep(10);
     instance.stdin.write("\r");
     await Bun.sleep(50);
-    expect(session.snapshot().cwd).toEqual({ objectNumber: 3, generation: 0 });
+    expect(session.snapshot().cwd).toEqual({ objectNumber: 2, generation: 0 });
     instance.unmount();
   });
 
@@ -126,13 +126,51 @@ describe("App", () => {
     let frame = instance.lastFrame() ?? "";
     expect(frame).toContain("find --type Page");
     expect(frame).toContain("Esc closes");
-    expect(frame).toContain("4 0 R");
+    expect(frame).toContain("3 0 R");
     expect(frame).not.toContain("outgoing");
 
     instance.stdin.write("");
     await Bun.sleep(50);
     frame = instance.lastFrame() ?? "";
     expect(frame).toContain("outgoing");
+    instance.unmount();
+  });
+
+  test("shows the last executed command in the command panel", async () => {
+    const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
+    const instance = render(createElement(App, { session }));
+    await Bun.sleep(50);
+    expect(instance.lastFrame() ?? "").toContain("last: (none)");
+
+    instance.stdin.write("pwd");
+    await Bun.sleep(10);
+    instance.stdin.write("\r");
+    await Bun.sleep(50);
+    expect(instance.lastFrame() ?? "").toContain("last: pwd");
+
+    instance.stdin.write("");
+    await Bun.sleep(50);
+    instance.stdin.write("cd /Pages");
+    await Bun.sleep(10);
+    instance.stdin.write("\r");
+    await Bun.sleep(50);
+    const frame = instance.lastFrame() ?? "";
+    expect(frame).toContain("last: cd /Pages");
+    expect(frame).toContain("outgoing");
+    instance.unmount();
+  });
+
+  test("graph navigation records the equivalent cd as the last command", async () => {
+    const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
+    const instance = render(createElement(App, { session }));
+    await Bun.sleep(50);
+    instance.stdin.write("[Z");
+    await Bun.sleep(10);
+    instance.stdin.write("\r");
+    await Bun.sleep(50);
+    const frame = instance.lastFrame() ?? "";
+    expect(frame).toContain("last: cd 2 0 R");
+    expect(session.snapshot().cwd).toEqual({ objectNumber: 2, generation: 0 });
     instance.unmount();
   });
 
@@ -200,7 +238,7 @@ describe("App", () => {
     instance.stdin.write("\r");
     await Bun.sleep(10);
     const frame = instance.lastFrame() ?? "";
-    expect(frame).toContain("› cd 3 0 R");
+    expect(frame).toContain("› cd 2 0 R");
     expect(session.snapshot().cwd).toEqual({ objectNumber: 1, generation: 0 });
     instance.unmount();
   });
@@ -209,11 +247,11 @@ describe("App", () => {
     const session = bindSession(minimalSession("minimal.pdf"), fakeAdapter());
     const instance = render(createElement(App, { session }));
     await Bun.sleep(50);
-    instance.stdin.write("cd 3");
+    instance.stdin.write("cd 2");
     await Bun.sleep(10);
     instance.stdin.write("\t");
     await Bun.sleep(10);
-    expect(instance.lastFrame() ?? "").toContain("› cd 3 0 R");
+    expect(instance.lastFrame() ?? "").toContain("› cd 2 0 R");
     expect(session.snapshot().cwd).toEqual({ objectNumber: 1, generation: 0 });
     instance.unmount();
   });

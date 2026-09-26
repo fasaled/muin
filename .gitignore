@@ -118,3 +118,9 @@ dist
 
 # Copied into publish artifacts at build time from repo-root vendor/qpdf
 packages/cli/vendor/
+
+# Local muin observation journals (see `muin --mcp --events`)
+.muin/
+
+# Local test documents (large PDFs for manual analysis, not fixtures)
+test-files/

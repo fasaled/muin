@@ -43,9 +43,11 @@ Comments explain non-obvious constraints, not the story of the change.
 | In-process session (tests / worker internals) | `packages/core/src/session-local.ts` |
 | WASM worker | `packages/core/src/worker/` |
 | PDF / qpdf / graph / commands / MCP | `packages/core/src/` |
+| Observation journal | `packages/core/src/journal/` (schema, writer, reader, `withJournal`) |
 | CLI argv / TUI | `packages/cli/src/` |
+| Follower (`--follow`) | `packages/cli/src/tui/` (`timeline.ts` pure state machine, `follow.ts` orchestration, `FollowApp.tsx` UI, `chrome.tsx` shared panes) |
 | Vendored WASM | `vendor/qpdf/` |
-| Fixtures | `fixtures/` |
+| Fixtures | `fixtures/` (`json/minimal.json` is regenerated from `pdf/minimal.pdf` via `bun fixtures/regen-minimal-json.ts` — keep them in sync) |
 | WASM build | `wasm/` + `docs/wasm.md` |
 
 ## Adding a command
@@ -62,6 +64,7 @@ Do not reimplement the verb inside the TUI or MCP.
 - Depend on a third-party npm qpdf/wasm wrapper.
 - Compile qpdf on the user’s machine at `npm install` time.
 - Start TUI and MCP in the same process.
+- Give the follower (`--follow`) any command input or history access: it is read-only by construction (no prompt, no history); drive its mirror session only through the journal.
 - Call `createSession` from the session worker (that would nest workers). Use `createSessionInProcess` there.
 - Dump unbounded graphs from `export_graph`.
 - Eval user `--where` strings as JavaScript.
